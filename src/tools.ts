@@ -127,6 +127,10 @@ const DEAL_CONTACT_ROLES = [
 
 const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001+'] as const
 
+const COMMUNICATION_TYPES = ['whatsapp', 'email', 'call', 'sms'] as const
+const COMMUNICATION_DIRECTIONS = ['inbound', 'outbound'] as const
+const COMMUNICATION_OUTCOMES = ['connected', 'no_answer', 'voicemail', 'busy'] as const
+
 /** Current channels. The enum also carries deprecated Skype/Teams v1 values. */
 const MEETING_CHANNELS = [
   'local',
@@ -1537,6 +1541,48 @@ export const TOOLS: ToolDefinition[] = [
     readOnly: true,
     run: (client, args) =>
       client.request('GET', '/crm/companies/summary', { query: args, root: true }),
+  },
+
+  // ---- Communications -------------------------------------------------------
+  {
+    name: 'get_deal_communications',
+    title: "Get a deal's communications",
+    description:
+      'Return all logged communications for a deal (WhatsApp, email, call, SMS), ordered by occurredAt.',
+    schema: { dealId: z.string() },
+    readOnly: true,
+    run: (client, { dealId }) =>
+      client.request('GET', `/crm/deals/${dealId}/communications`, { root: true }),
+  },
+  {
+    name: 'create_communication',
+    title: 'Log a communication',
+    description:
+      'Log a communication on a deal: a WhatsApp message, email, call or SMS.',
+    schema: {
+      dealId: z.string(),
+      type: z.enum(COMMUNICATION_TYPES),
+      direction: z.enum(COMMUNICATION_DIRECTIONS),
+      body: z.string(),
+      occurredAt: z.string().describe('ISO 8601'),
+      contactId: z.string().optional(),
+      crmCompanyId: z.string().optional(),
+      subject: z.string().optional(),
+      outcome: z.enum(COMMUNICATION_OUTCOMES).optional().describe('Only meaningful for calls'),
+    },
+    readOnly: false,
+    run: (client, body) =>
+      client.request('POST', '/crm/communications', { body, root: true }),
+  },
+  {
+    name: 'delete_communication',
+    title: 'Delete a communication',
+    description: 'Permanently delete a logged communication entry.',
+    schema: { communicationId: z.string() },
+    readOnly: false,
+    destructive: true,
+    run: (client, { communicationId }) =>
+      client.request('DELETE', `/crm/communications/${communicationId}`, { root: true }),
   },
 
   // ---- Webhooks -----------------------------------------------------------

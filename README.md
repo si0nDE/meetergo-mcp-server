@@ -203,7 +203,7 @@ server itself is never gated — a token from any plan, including Free, works.
 
 ## Tools
 
-76 tools, covering scheduling end to end. **Scheduling** is the loop most agents
+79 tools, covering scheduling end to end. **Scheduling** is the loop most agents
 live in; the rest is there so an agent never has to fall back to raw REST.
 
 ### Scheduling
@@ -300,6 +300,14 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 | `get_company_contacts` | | Contacts linked to a company |
 | `get_company_deals` | | Deals linked to a company, across every pipeline |
 | `get_company_summary` | | Company counts and pipeline value, grouped by industry and size |
+
+### Communications
+
+| Tool | Writes? | Purpose |
+|---|---|---|
+| `get_deal_communications` | | Logged communications for a deal: WhatsApp, email, call, SMS |
+| `create_communication` | **yes** | Log a communication on a deal |
+| `delete_communication` | **destructive** | Permanently delete a logged communication entry |
 
 ### Mira, the website assistant
 

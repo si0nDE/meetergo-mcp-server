@@ -8,7 +8,7 @@ import { TOOLS, sanitizeMiraSettingsForPatch } from '../tools.js'
  */
 describe('meetergo MCP tool surface', () => {
   it('covers the API surface an agent needs, with no duplicate names', () => {
-    expect(TOOLS).toHaveLength(76)
+    expect(TOOLS).toHaveLength(79)
     expect(new Set(TOOLS.map((t) => t.name)).size).toBe(TOOLS.length)
   })
 
@@ -56,6 +56,7 @@ describe('meetergo MCP tool surface', () => {
       'bulk_create_contacts',
       'cancel_appointment',
       'crawl_company_website',
+      'create_communication',
       'create_company',
       'create_contact',
       'create_data_field',
@@ -65,6 +66,7 @@ describe('meetergo MCP tool surface', () => {
       'create_qualification_form',
       'create_routing_form',
       'create_webhook',
+      'delete_communication',
       'delete_company',
       'delete_contact',
       'delete_deal',
@@ -108,6 +110,7 @@ describe('meetergo MCP tool surface', () => {
       'answer_visitor_question',
       'book_appointment',
       'cancel_appointment',
+      'delete_communication',
       'delete_company',
       'delete_contact',
       'delete_deal',
@@ -247,6 +250,7 @@ describe('meetergo MCP tool surface', () => {
       'documentId',
       'dealId',
       'crmCompanyId',
+      'communicationId',
     ]
     // Company-scoped singletons: there is exactly one target (the caller's own
     // page / the company's Mira config / its knowledge base), so no id exists.
@@ -627,6 +631,33 @@ describe('wire format', () => {
 
     const deals = await callTool('get_company_deals', { crmCompanyId: 'co-1' })
     expect(deals.path).toBe('/crm/companies/co-1/deals')
+  })
+
+  it('routes communication tools to the host root, on the deal-scoped path', async () => {
+    const list = await callTool('get_deal_communications', { dealId: 'd-1' })
+    expect(list).toMatchObject({ method: 'GET', path: '/crm/deals/d-1/communications' })
+    expect(list.options.root).toBe(true)
+
+    const created = await callTool('create_communication', {
+      dealId: 'd-1',
+      type: 'whatsapp',
+      direction: 'outbound',
+      body: 'Terminbuchungslink übermittelt.',
+      occurredAt: '2026-09-07T11:00:00.000Z',
+    })
+    expect(created).toMatchObject({ method: 'POST', path: '/crm/communications' })
+    expect(created.options.root).toBe(true)
+    expect(created.options.body).toMatchObject({
+      dealId: 'd-1',
+      type: 'whatsapp',
+      direction: 'outbound',
+      body: 'Terminbuchungslink übermittelt.',
+      occurredAt: '2026-09-07T11:00:00.000Z',
+    })
+
+    const deleted = await callTool('delete_communication', { communicationId: 'comm-1' })
+    expect(deleted).toMatchObject({ method: 'DELETE', path: '/crm/communications/comm-1' })
+    expect(deleted.options.root).toBe(true)
   })
 
   it('keeps scheduling tools on the versioned base', async () => {

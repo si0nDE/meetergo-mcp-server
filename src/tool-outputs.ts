@@ -203,6 +203,28 @@ const company = out(
   'A CRM company',
 )
 
+const communication = out(
+  {
+    id: str,
+    type: str.describe('whatsapp, email, call or sms'),
+    direction: str.describe('inbound or outbound'),
+    subject: str,
+    body: str,
+    durationSeconds: num,
+    outcome: str,
+    externalId: str,
+    dealId: str,
+    contactId: str,
+    crmCompanyId: str,
+    loggedById: str,
+    loggedByName: str,
+    occurredAt: str,
+    createdAt: str,
+    updatedAt: str,
+  },
+  'A logged communication (WhatsApp, email, call or SMS) on a deal',
+)
+
 const dealActivity = out(
   {
     id: str,
@@ -590,6 +612,9 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
     },
     'Company counts and pipeline value, grouped by industry and size',
   ),
+  get_deal_communications: listOf(communication, "A deal's logged communications"),
+  create_communication: communication,
+  delete_communication: ok,
   list_webhooks: listOf(webhook, 'Webhook subscriptions of the company'),
   create_webhook: webhook,
   update_webhook: webhook,

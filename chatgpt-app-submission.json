@@ -919,6 +919,42 @@
         "open_world_justification": "Operates only on this account's own private data in meetergo.",
         "destructive_justification": "Read-only; nothing is changed or removed."
       }
+    },
+    "get_deal_communications": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Lists logged communications for a deal.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "create_communication": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a new communication log entry on a deal.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Adds a record; nothing existing is changed or removed."
+      }
+    },
+    "delete_communication": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Permanently deletes a communication log entry.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Permanently removes a record the user may still want."
+      }
     }
   },
   "test_cases": [
