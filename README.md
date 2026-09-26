@@ -10,7 +10,7 @@ change anything. Both are useful and they do different jobs:
 | | Docs MCP | This server |
 |---|---|---|
 | Endpoint | `developer.meetergo.com/mcp` | `mcp.meetergo.com/mcp`, or `npx` over stdio |
-| Tools | `SearchMeetergo` | 57 scheduling, CRM, Mira and config tools |
+| Tools | `SearchMeetergo` | 88 scheduling, CRM, Mira and config tools |
 | Can it book? | No | **Yes** |
 | Use it to | write an integration | be the integration |
 
@@ -203,7 +203,7 @@ server itself is never gated — a token from any plan, including Free, works.
 
 ## Tools
 
-79 tools, covering scheduling end to end. **Scheduling** is the loop most agents
+88 tools, covering scheduling end to end. **Scheduling** is the loop most agents
 live in; the rest is there so an agent never has to fall back to raw REST.
 
 ### Scheduling
@@ -308,6 +308,36 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 | `get_deal_communications` | | Logged communications for a deal: WhatsApp, email, call, SMS |
 | `create_communication` | **yes** | Log a communication on a deal |
 | `delete_communication` | **destructive** | Permanently delete a logged communication entry |
+
+### Notes
+
+| Tool | Writes? | Purpose |
+|---|---|---|
+| `list_company_notes` | | Notes logged against a CRM company, most recent first |
+| `create_note` | **yes** | Log a note against a company, contact or deal — exactly one of the three is required |
+| `delete_note` | **destructive** | Permanently delete a logged note |
+
+### Attachments
+
+| Tool | Writes? | Purpose |
+|---|---|---|
+| `list_attachments` | | Attachments on a CRM company |
+
+There is no `create_attachment` yet: the API expects a `fileAssetId` from an
+upload step whose endpoint hasn't been found.
+
+### Tasks
+
+| Tool | Writes? | Purpose |
+|---|---|---|
+| `list_tasks` | | Paginated CRM tasks |
+| `get_task` | | One task in full, including its assignee and linked company |
+| `create_task` | **yes** | Create a task; `type` and `dueDate` are required |
+| `update_task` | **yes** | Change title, type, due date, description or linked company |
+| `delete_task` | **destructive** | Permanently delete a task |
+
+Marking a task done isn't offered: `completed`, `status`, `isCompleted` and
+`completedAt` all return HTTP 200 but are silently ignored by the API.
 
 ### Mira, the website assistant
 
