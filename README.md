@@ -10,7 +10,7 @@ change anything. Both are useful and they do different jobs:
 | | Docs MCP | This server |
 |---|---|---|
 | Endpoint | `developer.meetergo.com/mcp` | `mcp.meetergo.com/mcp`, or `npx` over stdio |
-| Tools | `SearchMeetergo` | 111 scheduling, CRM, Mira and config tools |
+| Tools | `SearchMeetergo` | 112 scheduling, CRM, Mira and config tools |
 | Can it book? | No | **Yes** |
 | Use it to | write an integration | be the integration |
 
@@ -203,7 +203,7 @@ server itself is never gated — a token from any plan, including Free, works.
 
 ## Tools
 
-111 tools, covering scheduling end to end. **Scheduling** is the loop most agents
+112 tools, covering scheduling end to end. **Scheduling** is the loop most agents
 live in; the rest is there so an agent never has to fall back to raw REST.
 
 ### Scheduling
@@ -266,6 +266,7 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 | Tool | Writes? | Purpose |
 |---|---|---|
 | `search_contacts` | | Find a contact before creating a duplicate |
+| `find_duplicate_contacts` | | Group existing contacts by shared email, phone or name — there is no dedicated dedup endpoint for contacts (unlike deals), so this pages through every contact and groups client-side |
 | `get_contact` | | Full record, by `contactId` or by `attendeeId` from a booking |
 | `create_contact` | **yes** | Add a contact; also takes `address` and `additionalData` |
 | `update_contact` | **yes** | Edit a contact, including `language`, `address`, `additionalData` and the research-suggested `title`/`employer`/`seniority`/`function`/`location` |

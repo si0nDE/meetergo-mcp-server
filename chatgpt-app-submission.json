@@ -812,6 +812,18 @@
         "destructive_justification": "Permanently removes the subscription and stops delivery."
       }
     },
+    "find_duplicate_contacts": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Groups existing contacts by shared email, phone or name, computed from a full contact scan.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
     "get_mira_settings": {
       "annotations": {
         "readOnlyHint": true,

@@ -8,7 +8,7 @@ import { TOOLS, sanitizeMiraSettingsForPatch } from '../tools.js'
  */
 describe('meetergo MCP tool surface', () => {
   it('covers the API surface an agent needs, with no duplicate names', () => {
-    expect(TOOLS).toHaveLength(111)
+    expect(TOOLS).toHaveLength(112)
     expect(new Set(TOOLS.map((t) => t.name)).size).toBe(TOOLS.length)
   })
 
@@ -997,6 +997,64 @@ describe('wire format', () => {
     const call = await callTool('search_contacts', { searchTerm: 'Ada' })
     expect(call.options.query).toMatchObject({ searchTerm: 'Ada' })
     expect(call.options.query).not.toHaveProperty('email')
+  })
+
+  it('find_duplicate_contacts pages through every contact and groups by email, phone or name', async () => {
+    const tool = TOOLS.find((t) => t.name === 'find_duplicate_contacts')!
+    const pages = [
+      {
+        result: [
+          { id: 'c-1', email: 'Info@Example.com', firstName: 'Ada', lastName: 'Lovelace' },
+          { id: 'c-2', email: 'info@example.com', firstName: 'A.', lastName: 'L.' },
+          { id: 'c-3', phoneNumber: '+49 151 2345678', firstName: 'Bob', lastName: 'Smith' },
+        ],
+        totalPages: 2,
+      },
+      {
+        result: [
+          { id: 'c-4', phoneNumber: '+49-151-2345678' },
+          { id: 'c-5', firstName: 'Ada', lastName: 'Lovelace' },
+          { id: 'c-6', firstName: 'Unique', lastName: 'Person' },
+        ],
+        totalPages: 2,
+      },
+    ]
+    const calls: RecordedCall[] = []
+    let call = 0
+    const client = {
+      nextUrl: 'https://next.test',
+      request: (method: string, path: string, options: RequestOptions = {}) => {
+        calls.push({ method, path, options })
+        const page = pages[call]
+        call += 1
+        return Promise.resolve(page)
+      },
+    } as unknown as MeetergoClient
+
+    const result = (await tool.run(client, {})) as {
+      totalContactsScanned: number
+      duplicateGroups: Array<{ reason: string; contacts: Array<{ contactId: string }> }>
+    }
+
+    expect(calls).toHaveLength(2)
+    expect(calls[0]).toMatchObject({ method: 'GET', path: '/crm' })
+    expect(calls[0].options.query).toMatchObject({ page: 1, limit: 1000 })
+    expect(calls[1].options.query).toMatchObject({ page: 2, limit: 1000 })
+    expect(result.totalContactsScanned).toBe(6)
+
+    const idsOf = (reason: string) =>
+      result.duplicateGroups
+        .find((g) => g.reason === reason)
+        ?.contacts.map((c) => c.contactId)
+        .sort()
+    expect(idsOf('email')).toEqual(['c-1', 'c-2'])
+    expect(idsOf('phone')).toEqual(['c-3', 'c-4'])
+    expect(idsOf('name')).toEqual(['c-1', 'c-5'])
+
+    // c-6 matches nothing and must not appear in any group.
+    for (const group of result.duplicateGroups) {
+      expect(group.contacts.some((c) => c.contactId === 'c-6')).toBe(false)
+    }
   })
 
   it('strips embedded deal objects from list_deals by default', async () => {

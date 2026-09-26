@@ -127,6 +127,27 @@ const contact = out(
   'A CRM contact',
 )
 
+const contactSummary = out(
+  {
+    contactId: str,
+    firstName: str,
+    lastName: str,
+    email: str,
+    phoneNumber: str,
+    crmCompanyId: str,
+  },
+  'A compact contact reference within a duplicate group',
+)
+
+const duplicateContactGroup = out(
+  {
+    reason: str.describe('email, phone or name'),
+    key: str.describe('The normalized value the group matched on'),
+    contacts: list(contactSummary),
+  },
+  'Contacts that share a normalized email, phone or name',
+)
+
 const pipelineStage = out(
   {
     id: str,
@@ -622,6 +643,13 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
       totalPages: any('Total pages'),
     },
     'Paginated matching CRM contacts',
+  ),
+  find_duplicate_contacts: out(
+    {
+      totalContactsScanned: num,
+      duplicateGroups: list(duplicateContactGroup),
+    },
+    'Contacts grouped by likely duplicate, computed client-side',
   ),
   get_contact: out(
     {

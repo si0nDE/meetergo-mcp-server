@@ -306,6 +306,28 @@ function scopedCrmPath(ids: CrmScopeId, suffix: string): string {
   return `/crm/${CRM_SCOPE_PARENTS[key]}/${value}/${suffix}`
 }
 
+interface ContactSummary {
+  contactId: string
+  firstName?: string
+  lastName?: string
+  email?: string
+  phoneNumber?: string
+  crmCompanyId?: string
+}
+
+/** The handful of fields find_duplicate_contacts groups on, off a raw /crm row. */
+function summarizeContact(raw: unknown): ContactSummary {
+  const c = raw as Record<string, unknown>
+  return {
+    contactId: String(c.id ?? ''),
+    firstName: typeof c.firstName === 'string' ? c.firstName : undefined,
+    lastName: typeof c.lastName === 'string' ? c.lastName : undefined,
+    email: typeof c.email === 'string' ? c.email : undefined,
+    phoneNumber: typeof c.phoneNumber === 'string' ? c.phoneNumber : undefined,
+    crmCompanyId: typeof c.crmCompanyId === 'string' ? c.crmCompanyId : undefined,
+  }
+}
+
 /**
  * `webChat.publicKey` is server-minted and absent from the update DTO; the
  * API's forbidNonWhitelisted validation 400s any payload that carries it. It
@@ -793,7 +815,7 @@ export const TOOLS: ToolDefinition[] = [
       sortBy: z.enum(['firstName', 'lastName', 'email', 'createdAt']).optional(),
       sortOrder: z.enum(['ASC', 'DESC']).optional(),
       page: z.number().int().min(1).optional(),
-      limit: z.number().int().min(1).max(100).optional(),
+      limit: z.number().int().min(1).max(1000).optional(),
     },
     readOnly: true,
     run: async (client, args) => {
@@ -823,6 +845,48 @@ export const TOOLS: ToolDefinition[] = [
       }
       if (Array.isArray(result)) return result.filter(isExactMatch)
       return result
+    },
+  },
+  {
+    name: 'find_duplicate_contacts',
+    title: 'Find duplicate contacts',
+    description:
+      "Group existing contacts that share a normalized email, phone number or full name — the same grouping the web UI's duplicate panel shows, computed here instead of on a dedicated endpoint, because there isn't one; the CRM API has real dedup/merge endpoints for deals, but none for contacts. Pages through every contact with no cap, so a very large contact base means many sequential calls. Phone matching strips everything but digits, so the same number in two different formats still matches, but two different country-code writings of the same underlying number may not.",
+    schema: {},
+    readOnly: true,
+    run: async (client) => {
+      const contacts: ContactSummary[] = []
+      const limit = 1000
+      for (let page = 1; ; page += 1) {
+        const response = (await client.request('GET', '/crm', {
+          query: { page, limit },
+          root: true,
+        })) as { result?: unknown[]; totalPages?: number }
+        const batch = Array.isArray(response.result) ? response.result : []
+        contacts.push(...batch.map(summarizeContact))
+        if (!response.totalPages || page >= response.totalPages || batch.length === 0) break
+      }
+
+      const groups = new Map<string, { reason: 'email' | 'phone' | 'name'; key: string; contacts: ContactSummary[] }>()
+      const addTo = (reason: 'email' | 'phone' | 'name', key: string, contact: ContactSummary) => {
+        const groupKey = `${reason}:${key}`
+        const group = groups.get(groupKey) ?? { reason, key, contacts: [] }
+        group.contacts.push(contact)
+        groups.set(groupKey, group)
+      }
+
+      for (const contact of contacts) {
+        if (contact.email) addTo('email', contact.email.trim().toLowerCase(), contact)
+        const digits = contact.phoneNumber?.replace(/\D/g, '')
+        if (digits) addTo('phone', digits, contact)
+        const name = `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim().toLowerCase()
+        if (name) addTo('name', name, contact)
+      }
+
+      return {
+        totalContactsScanned: contacts.length,
+        duplicateGroups: [...groups.values()].filter((g) => g.contacts.length > 1),
+      }
     },
   },
   {
