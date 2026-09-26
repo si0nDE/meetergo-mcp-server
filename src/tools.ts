@@ -1873,7 +1873,7 @@ export const TOOLS: ToolDefinition[] = [
     name: 'list_communications',
     title: 'List communications',
     description:
-      'List logged communications (WhatsApp, email, call, SMS) for a company, deal or contact, ordered by occurredAt. Exactly one of crmCompanyId, dealId or contactId is required.',
+      "List logged communications (WhatsApp, email, call, SMS) for a company, deal or contact, ordered by occurredAt. Exactly one of crmCompanyId, dealId or contactId is required. dealId and contactId are not a strict subset of each other: the API joins through the contact-deal link, so a contact with a communication logged directly at the deal and one logged directly at the contact returns both entries from either scope — confirmed live on a real 1:1 contact/deal pair, unconfirmed how this behaves on a contact with several deals. crmCompanyId stays strict: it only returns entries logged directly against the company, not everything reachable through its deals or contacts.",
     schema: {
       crmCompanyId: z.string().optional(),
       dealId: z.string().optional(),

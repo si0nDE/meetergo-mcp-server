@@ -345,7 +345,11 @@ nobody sees.
 
 `list_communications`/`create_communication` require exactly one of
 `crmCompanyId`, `dealId` or `contactId` — the same one-of-three scoping as
-notes.
+notes. `dealId` and `contactId` are not strict subsets of each other, though:
+the API joins through the contact-deal link, so a communication logged
+directly on the deal shows up under the linked contact's scope too, and vice
+versa. `crmCompanyId` stays strict — it never reaches through to a company's
+deals or contacts.
 
 ### Notes
 
