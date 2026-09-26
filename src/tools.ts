@@ -1523,7 +1523,7 @@ export const TOOLS: ToolDefinition[] = [
     name: 'get_deal_summary',
     title: 'Get deal summary',
     description:
-      'Aggregate deal counts and value across the pipeline: open/won/lost, weighted forecast, and a breakdown by stage. The API spec marks ownerId and pipelineId as required query params, but this tool leaves both optional — pass them to scope the summary, omit them for everything.',
+      'Aggregate deal counts and value across the pipeline: open/won/lost, weighted forecast, and a breakdown by stage. The API spec marks ownerId and pipelineId required; live-confirmed that omitting both is not an error — it returns the full pipeline, every owner and every stage. Pass either to scope the summary down.',
     schema: {
       ownerId: z.string().optional(),
       pipelineId: z.string().optional(),
@@ -1924,7 +1924,7 @@ export const TOOLS: ToolDefinition[] = [
     name: 'get_task_summary',
     title: 'Get task summary',
     description:
-      'Aggregate task counts: total, completed, overdue, due today, due this week, and breakdowns by type and priority. The API spec marks assigneeId as a required query param, but this tool leaves it optional — pass it to scope the summary to one assignee, omit it for everyone.',
+      'Aggregate task counts: total, completed, overdue, due today, due this week, and breakdowns by type and priority. The API spec marks assigneeId required; live-confirmed that omitting it is not an error — it returns the aggregate across every assignee. Pass it to scope down to one.',
     schema: { assigneeId: z.string().optional() },
     readOnly: true,
     run: (client, args) => client.request('GET', '/crm/tasks/summary', { query: args, root: true }),
@@ -1941,7 +1941,7 @@ export const TOOLS: ToolDefinition[] = [
     name: 'list_upcoming_tasks',
     title: 'List upcoming tasks',
     description:
-      'List open tasks due within the next few days. The API spec marks days as a required query param, but this tool leaves it optional in case a default window applies when omitted.',
+      'List open tasks due within the next few days. The API spec marks days required; live-confirmed that omitting it is not an error — it returns upcoming tasks on whatever window the API defaults to.',
     schema: { days: z.number().int().min(1).optional().describe('Window size in days') },
     readOnly: true,
     run: (client, args) => client.request('GET', '/crm/tasks/upcoming', { query: args, root: true }),
