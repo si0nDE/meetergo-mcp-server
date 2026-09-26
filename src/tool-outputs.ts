@@ -147,6 +147,27 @@ const pipeline = out(
   'A sales pipeline with its stages',
 )
 
+const dealSignal = out(
+  {
+    healthScore: num,
+    healthBand: str.describe('e.g. on_track'),
+    daysInStage: num,
+    daysSinceLastActivity: num,
+    daysSinceLastInbound: num,
+    daysSinceLastOutbound: num,
+    followUpsSinceLastReply: num,
+    hasReplyEver: bool,
+    inboundCount: num,
+    outboundCount: num,
+    meetingsBooked: num,
+    meetingsHeld: num,
+    openTaskCount: num,
+    overdueTaskCount: num,
+    computedAt: str,
+  },
+  'Server-computed deal health, attached to every deal read',
+)
+
 const deal = out(
   {
     id: str.describe('The dealId other tools take'),
@@ -173,6 +194,7 @@ const deal = out(
     stage: record.nullable().optional(),
     owner: record.nullable().optional(),
     contacts: list(record),
+    signal: dealSignal.nullable().optional(),
     createdAt: str,
     updatedAt: str,
   },
@@ -617,11 +639,13 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
   create_data_field: dataField,
   bulk_create_contacts: out(
     {
-      items: any('Created contacts, when the API returns a plain list'),
-      created: any('Created contacts or their count'),
-      failed: any('Rows that were rejected, with the reason'),
+      created: num.describe('Newly inserted contacts'),
+      updated: num.describe('Existing contacts updated in place, only when updateExisting is true'),
+      skipped: num.describe('Existing/duplicate contacts left untouched'),
+      failed: num,
+      issues: list(record),
     },
-    'Result of the bulk import',
+    'Result counts from the bulk contact import',
   ),
   delete_contact: ok,
   list_pipelines: listOf(pipeline, 'Sales pipelines and their stages'),
@@ -643,6 +667,46 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
   mark_deal_lost: deal,
   reopen_deal: deal,
   get_deal_activity: listOf(dealActivity, "A deal's activity log, most recent first"),
+  get_deal_summary: out(
+    {
+      totalDeals: num,
+      totalValue: num,
+      weightedForecast: num,
+      openDeals: num,
+      wonDeals: num,
+      lostDeals: num,
+      currencies: list(record).describe('Deal counts by currency'),
+      displayCurrency: str.describe('Majority currency, for formatting the aggregate totals'),
+      byStage: list(record),
+    },
+    'Deal counts and value across the pipeline, grouped by stage',
+  ),
+  get_deal_limits: out(
+    { count: num, limit: num.describe('-1 means unlimited on the current plan') },
+    "The account's deal count against its plan limit",
+  ),
+  find_duplicate_deals: listOf(record, 'Deals that look like duplicates, each with a match score'),
+  get_deal_contact_suggestions: listOf(record, 'Contacts this deal is probably about'),
+  merge_deals: out(
+    {
+      dealId: str.describe('The surviving deal'),
+      mergedCount: any('Deals merged in'),
+      moved: record.nullable().optional().describe('Counts of records moved onto the survivor, by type'),
+    },
+    'Result of merging duplicate deals into the survivor',
+  ),
+  bulk_import_deals: out(
+    {
+      contactsCreated: num,
+      contactsUpdated: num,
+      contactsSkipped: num,
+      dealsCreated: num,
+      dealsSkipped: num.describe('Not created because the plan deal limit was reached'),
+      failed: num,
+      issues: list(record),
+    },
+    'Result counts from the bulk deal import',
+  ),
   list_companies: out(
     {
       result: list(company),
@@ -693,6 +757,21 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
     'Paginated CRM tasks',
   ),
   get_task: task,
+  get_task_summary: out(
+    {
+      totalTasks: num,
+      completedTasks: num,
+      overdueTasks: num,
+      dueTodayTasks: num,
+      dueThisWeekTasks: num,
+      byType: list(record),
+      byPriority: list(record),
+    },
+    'Aggregate task counts, overall or for one assignee',
+  ),
+  list_overdue_tasks: listOf(task, 'Open tasks past their due date'),
+  list_upcoming_tasks: listOf(task, 'Open tasks due soon'),
+  list_company_tasks: listOf(task, "A company's tasks"),
   create_task: task,
   update_task: task,
   complete_task: task,

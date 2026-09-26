@@ -10,7 +10,7 @@ change anything. Both are useful and they do different jobs:
 | | Docs MCP | This server |
 |---|---|---|
 | Endpoint | `developer.meetergo.com/mcp` | `mcp.meetergo.com/mcp`, or `npx` over stdio |
-| Tools | `SearchMeetergo` | 91 scheduling, CRM, Mira and config tools |
+| Tools | `SearchMeetergo` | 101 scheduling, CRM, Mira and config tools |
 | Can it book? | No | **Yes** |
 | Use it to | write an integration | be the integration |
 
@@ -203,7 +203,7 @@ server itself is never gated — a token from any plan, including Free, works.
 
 ## Tools
 
-91 tools, covering scheduling end to end. **Scheduling** is the loop most agents
+101 tools, covering scheduling end to end. **Scheduling** is the loop most agents
 live in; the rest is there so an agent never has to fall back to raw REST.
 
 ### Scheduling
@@ -272,13 +272,19 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 | `bulk_create_contacts` | **yes** | Import many at once (3 calls per min) |
 | `delete_contact` | **destructive** | Remove a contact and its form answers |
 
+A contact row with `crmCompanyRef` also auto-creates a separate, unlisted
+`ContactCompany` record from its email domain if that domain hasn't been seen
+before — harmless for a handful of known domains, but a large import across
+many distinct domains leaves that many orphan records with no endpoint to
+view or remove them.
+
 ### Deals
 
 | Tool | Writes? | Purpose |
 |---|---|---|
 | `list_pipelines` | | Pipelines and their stages — read this before creating or moving a deal |
 | `list_deals` | | Search and filter by pipeline, stage, contact, company, owner or outcome |
-| `get_deal` | | Full record, including linked contact, company, stage and owner |
+| `get_deal` | | Full record, including linked contact, company, stage, owner and a `signal` health block (health score, days in stage, in/outbound counts, open/overdue tasks) |
 | `create_deal` | **yes** | Add a deal to a pipeline |
 | `update_deal` | **yes** | Change value, stage, owner, contact or company |
 | `delete_deal` | **destructive** | Remove a deal and its activity history |
@@ -286,6 +292,16 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 | `mark_deal_lost` | **yes** | Close as lost, with an optional reason |
 | `reopen_deal` | **yes** | Undo a won or lost outcome |
 | `get_deal_activity` | | Stage-change and update history, most recent first |
+| `get_deal_summary` | | Deal counts and value across the pipeline, by stage |
+| `get_deal_limits` | | Deal count against the plan limit (`-1` = unlimited) |
+| `find_duplicate_deals` | | Deals that look like duplicates of a given deal, with a match score |
+| `get_deal_contact_suggestions` | | Contacts a deal is probably about, when none is linked yet |
+| `merge_deals` | **destructive** | Merge duplicates into a survivor; the merged-in deals are permanently deleted |
+| `bulk_import_deals` | **yes** | Upsert contacts and create one deal per row, into one pipeline stage (max 500 rows) |
+
+`bulk_import_deals` has the same `crmCompanyRef` orphan-record caveat as
+`bulk_create_contacts` above. Look up and confirm duplicates with
+`find_duplicate_deals` before calling `merge_deals` — it cannot be undone.
 
 ### Companies
 
@@ -352,10 +368,16 @@ saves anything, so it's deliberately not wired up either.
 | `complete_task` | **yes** | Mark a task done, on its own endpoint — no body |
 | `uncomplete_task` | **yes** | Reopen a completed task, on its own endpoint — no body |
 | `delete_task` | **destructive** | Permanently delete a task |
+| `get_task_summary` | | Aggregate counts: total, completed, overdue, due today/this week, by type and priority |
+| `list_overdue_tasks` | | Open tasks past their due date |
+| `list_upcoming_tasks` | | Open tasks due soon |
+| `list_company_tasks` | | A company's tasks, on the confirmed `by-company` endpoint |
 
 `completed`, `status`, `isCompleted` and `completedAt` are silently ignored on
 `update_task` itself — HTTP 200, no effect. `complete_task`/`uncomplete_task`
-are the only endpoints that actually flip it.
+are the only endpoints that actually flip it. `list_tasks`'s own
+`crmCompanyId` filter was never confirmed to filter anything — prefer
+`list_company_tasks` when scoping to one company.
 
 ### Mira, the website assistant
 

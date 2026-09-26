@@ -1247,7 +1247,7 @@ export const TOOLS: ToolDefinition[] = [
     name: 'bulk_create_contacts',
     title: 'Bulk-create contacts',
     description:
-      'Create many contacts in one import. Each needs email or phoneNumber. A call accepts up to 1000 contacts and the endpoint is limited to 3 calls per minute.',
+      'Create many contacts in one import. Each needs email or phoneNumber. A call accepts up to 1000 contacts and the endpoint is limited to 3 calls per minute. A contact with crmCompanyRef also auto-creates a separate, unlisted ContactCompany record from its email domain if that domain hasn\'t been seen before — harmless for a handful of known test domains, but a large import across many distinct domains leaves that many orphan records with no endpoint to view or remove them.',
     schema: {
       contacts: z
         .array(
@@ -1259,6 +1259,22 @@ export const TOOLS: ToolDefinition[] = [
               phoneNumber: z.string().optional(),
               tags: z.array(z.string()).optional(),
               notes: z.string().optional(),
+              accountOwnerEmail: z
+                .string()
+                .email()
+                .optional()
+                .describe('A user in the same account, set as the contact’s owner'),
+              meetingTypeRef: z.string().optional().describe('Meeting type UUID or name'),
+              crmCompanyRef: z
+                .string()
+                .optional()
+                .describe(
+                  'CrmCompany UUID or display name; an unknown name is auto-created so new companies never fail the row',
+                ),
+              additionalData: z
+                .record(z.unknown())
+                .optional()
+                .describe('Arbitrary extra data (UTM params, source, ...) stored on the contact'),
             })
             // The API's own email-or-phone constraint is skipped when email is
             // absent, so an empty row imports as a blank contact. Catch it here.
@@ -1269,6 +1285,10 @@ export const TOOLS: ToolDefinition[] = [
         )
         .min(1)
         .max(1000),
+      updateExisting: z
+        .boolean()
+        .optional()
+        .describe('Update existing contacts by email instead of skipping them'),
     },
     readOnly: false,
     run: (client, body) =>
@@ -1498,6 +1518,127 @@ export const TOOLS: ToolDefinition[] = [
         query: { limit: limit ?? 50 },
         root: true,
       }),
+  },
+  {
+    name: 'get_deal_summary',
+    title: 'Get deal summary',
+    description:
+      'Aggregate deal counts and value across the pipeline: open/won/lost, weighted forecast, and a breakdown by stage. The API spec marks ownerId and pipelineId as required query params, but this tool leaves both optional — pass them to scope the summary, omit them for everything.',
+    schema: {
+      ownerId: z.string().optional(),
+      pipelineId: z.string().optional(),
+    },
+    readOnly: true,
+    run: (client, args) => client.request('GET', '/crm/deals/summary', { query: args, root: true }),
+  },
+  {
+    name: 'get_deal_limits',
+    title: 'Get deal limits',
+    description: "Return the account's deal count against its plan limit. limit is -1 when the plan is unlimited.",
+    schema: {},
+    readOnly: true,
+    run: (client) => client.request('GET', '/crm/deals/limits', { root: true }),
+  },
+  {
+    name: 'find_duplicate_deals',
+    title: 'Find duplicate deals',
+    description:
+      'Return deals that look like duplicates of this one (same company, similar name), each with a match score and reasons. Read-only and merges nothing — the caller still picks which candidate, if any, to merge.',
+    schema: { dealId: z.string() },
+    readOnly: true,
+    run: (client, { dealId }) =>
+      client.request('GET', `/crm/deals/${dealId}/duplicate-candidates`, { root: true }),
+  },
+  {
+    name: 'get_deal_contact_suggestions',
+    title: 'Get contact suggestions for a deal',
+    description:
+      "Return contacts this deal is probably about, when none is linked yet — matched by phone number or by name. Read-only and links nothing; a wrong link moves someone else's emails and meetings onto the deal, so the caller confirms before linking.",
+    schema: { dealId: z.string() },
+    readOnly: true,
+    run: (client, { dealId }) =>
+      client.request('GET', `/crm/deals/${dealId}/contact-suggestions`, { root: true }),
+  },
+  {
+    name: 'merge_deals',
+    title: 'Merge duplicate deals',
+    description:
+      'Merge one or more duplicate deals into a survivor. dealId is the deal that survives; duplicateDealIds are merged into it and then permanently deleted — their notes, tasks, attachments and activity move to the survivor first, but the duplicate records themselves do not come back. Look up candidates and get explicit confirmation before calling this.',
+    schema: {
+      dealId: z.string().describe('The surviving deal'),
+      duplicateDealIds: z
+        .array(z.string())
+        .min(1)
+        .max(20)
+        .describe('Deals to merge in and delete'),
+    },
+    readOnly: false,
+    destructive: true,
+    run: (client, { dealId, duplicateDealIds }) =>
+      client.request('POST', `/crm/deals/${dealId}/merge`, {
+        body: { duplicateDealIds },
+        root: true,
+      }),
+  },
+  {
+    name: 'bulk_import_deals',
+    title: 'Bulk-import deals',
+    description:
+      'Upsert contacts and create one deal per row, into one target pipeline stage. Up to 500 rows per call. A row with crmCompanyRef also auto-creates a separate, unlisted ContactCompany record from the contact\'s email domain if the domain hasn\'t been seen before — harmless for a handful of known test domains, but a large import across many distinct domains leaves that many orphan records with no endpoint to view or remove them. Each row needs an email or a phoneNumber, mirroring the plain contact import.',
+    schema: {
+      rows: z
+        .array(
+          z
+            .object({
+              firstName: z.string().optional(),
+              lastName: z.string().optional(),
+              email: z.string().email().optional(),
+              phoneNumber: z.string().optional(),
+              tags: z.array(z.string()).optional(),
+              notes: z.string().optional().describe("The contact's own note, distinct from dealNotes"),
+              accountOwnerEmail: z
+                .string()
+                .email()
+                .optional()
+                .describe('A user in the same account, set as the contact’s owner'),
+              meetingTypeRef: z.string().optional().describe('Meeting type UUID or name'),
+              crmCompanyRef: z
+                .string()
+                .optional()
+                .describe(
+                  'CrmCompany UUID or display name; an unknown name is auto-created so new companies never fail the row',
+                ),
+              additionalData: z
+                .record(z.unknown())
+                .optional()
+                .describe('Arbitrary extra data (UTM params, source, ...) stored on the contact'),
+              dealName: z.string().max(255).optional().describe("Falls back to the contact's name"),
+              dealValue: z.number().min(0).optional(),
+              dealCurrency: z.string().length(3).optional().describe('ISO-4217, defaults to EUR'),
+              dealExpectedCloseDate: z.string().optional().describe('YYYY-MM-DD'),
+              dealOwnerEmail: z
+                .string()
+                .email()
+                .optional()
+                .describe('A user in the same account; unresolvable emails fall back to the importing user'),
+              dealNotes: z.string().optional().describe("The deal's own note, distinct from the contact's notes"),
+            })
+            .refine(
+              (r) => Boolean(r.email || r.phoneNumber),
+              'Each row needs an email or a phoneNumber',
+            ),
+        )
+        .min(1)
+        .max(500),
+      pipelineId: z.string(),
+      stageId: z.string(),
+      updateExisting: z
+        .boolean()
+        .optional()
+        .describe('Update existing contacts by email instead of skipping them. A deal is still created either way.'),
+    },
+    readOnly: false,
+    run: (client, body) => client.request('POST', '/crm/deals/bulk-import', { body, root: true }),
   },
 
   // ---- Companies ------------------------------------------------------------
@@ -1761,7 +1902,10 @@ export const TOOLS: ToolDefinition[] = [
     schema: {
       page: z.number().int().min(1).optional(),
       limit: z.number().int().min(1).optional(),
-      crmCompanyId: z.string().optional(),
+      crmCompanyId: z
+        .string()
+        .optional()
+        .describe('Unconfirmed as a filter here — list_company_tasks uses the confirmed endpoint instead'),
       dealId: z.string().optional(),
       contactId: z.string().optional(),
     },
@@ -1775,6 +1919,42 @@ export const TOOLS: ToolDefinition[] = [
     schema: { taskId: z.string() },
     readOnly: true,
     run: (client, { taskId }) => client.request('GET', `/crm/tasks/${taskId}`, { root: true }),
+  },
+  {
+    name: 'get_task_summary',
+    title: 'Get task summary',
+    description:
+      'Aggregate task counts: total, completed, overdue, due today, due this week, and breakdowns by type and priority. The API spec marks assigneeId as a required query param, but this tool leaves it optional — pass it to scope the summary to one assignee, omit it for everyone.',
+    schema: { assigneeId: z.string().optional() },
+    readOnly: true,
+    run: (client, args) => client.request('GET', '/crm/tasks/summary', { query: args, root: true }),
+  },
+  {
+    name: 'list_overdue_tasks',
+    title: 'List overdue tasks',
+    description: 'List open tasks whose due date has already passed, most relevant first.',
+    schema: {},
+    readOnly: true,
+    run: (client) => client.request('GET', '/crm/tasks/overdue', { root: true }),
+  },
+  {
+    name: 'list_upcoming_tasks',
+    title: 'List upcoming tasks',
+    description:
+      'List open tasks due within the next few days. The API spec marks days as a required query param, but this tool leaves it optional in case a default window applies when omitted.',
+    schema: { days: z.number().int().min(1).optional().describe('Window size in days') },
+    readOnly: true,
+    run: (client, args) => client.request('GET', '/crm/tasks/upcoming', { query: args, root: true }),
+  },
+  {
+    name: 'list_company_tasks',
+    title: "Get a company's tasks",
+    description:
+      "List tasks linked to a CRM company, on its own confirmed endpoint — the flat listing tool's crmCompanyId filter was never confirmed to actually filter anything.",
+    schema: { crmCompanyId: z.string() },
+    readOnly: true,
+    run: (client, { crmCompanyId }) =>
+      client.request('GET', `/crm/tasks/by-company/${crmCompanyId}`, { root: true }),
   },
   {
     name: 'create_task',

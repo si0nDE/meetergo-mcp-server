@@ -440,6 +440,18 @@
         "destructive_justification": "Does not delete data, revoke access, or perform irreversible actions."
       }
     },
+    "bulk_import_deals": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Upserts contacts and creates one deal per row, in bulk.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Adds records; nothing existing is changed or removed."
+      }
+    },
     "delete_contact": {
       "annotations": {
         "readOnlyHint": false,
@@ -570,6 +582,66 @@
         "read_only_justification": "Reads a deal's stage-change and update history.",
         "open_world_justification": "Operates only on this account's own private data in meetergo.",
         "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "get_deal_summary": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Aggregates deal counts and value across the pipeline.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "get_deal_limits": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Returns the account's deal count against its plan limit.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "find_duplicate_deals": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Lists deals that look like duplicates of a given deal.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "get_deal_contact_suggestions": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Suggests contacts a deal is probably about, when none is linked yet.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "merge_deals": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Merges one or more duplicate deals into a survivor.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Permanently deletes the merged-in deals after moving their data to the survivor; irreversible."
       }
     },
     "list_webhooks": {
@@ -1036,6 +1108,54 @@
       },
       "justifications": {
         "read_only_justification": "Returns a single CRM task by id.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "get_task_summary": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Aggregates task counts, overall or for one assignee.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "list_overdue_tasks": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Lists open tasks past their due date.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "list_upcoming_tasks": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Lists open tasks due soon.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "list_company_tasks": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Lists tasks linked to a CRM company.",
         "open_world_justification": "Operates only on this account's own private data in meetergo.",
         "destructive_justification": "Read-only; nothing is changed or removed."
       }

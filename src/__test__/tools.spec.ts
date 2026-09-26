@@ -8,7 +8,7 @@ import { TOOLS, sanitizeMiraSettingsForPatch } from '../tools.js'
  */
 describe('meetergo MCP tool surface', () => {
   it('covers the API surface an agent needs, with no duplicate names', () => {
-    expect(TOOLS).toHaveLength(91)
+    expect(TOOLS).toHaveLength(101)
     expect(new Set(TOOLS.map((t) => t.name)).size).toBe(TOOLS.length)
   })
 
@@ -54,6 +54,7 @@ describe('meetergo MCP tool surface', () => {
       'answer_visitor_question',
       'book_appointment',
       'bulk_create_contacts',
+      'bulk_import_deals',
       'cancel_appointment',
       'complete_task',
       'crawl_company_website',
@@ -82,6 +83,7 @@ describe('meetergo MCP tool surface', () => {
       'import_booking_page',
       'mark_deal_lost',
       'mark_deal_won',
+      'merge_deals',
       'reopen_deal',
       'reschedule_appointment',
       'restore_mira_settings',
@@ -127,6 +129,7 @@ describe('meetergo MCP tool surface', () => {
       'delete_routing_form',
       'delete_task',
       'delete_webhook',
+      'merge_deals',
       'reschedule_appointment',
       'restore_mira_settings',
       'send_quick_email',
@@ -245,6 +248,9 @@ describe('meetergo MCP tool surface', () => {
     const isCreate = (n: string) =>
       n.startsWith('create_') ||
       n === 'bulk_create_contacts' ||
+      // Upserts contacts by email and always creates a fresh deal per row —
+      // there is no existing record any single argument could name.
+      n === 'bulk_import_deals' ||
       // Additive by construction: it only ever creates meeting types from a
       // source URL and never edits or removes one that already exists, so
       // there is no target record to name.
@@ -600,6 +606,45 @@ describe('wire format', () => {
     expect(call.options.query).toMatchObject({ limit: 50 })
   })
 
+  it('routes the deal dashboard and dedup tools to their confirmed paths', async () => {
+    const summary = await callTool('get_deal_summary', { pipelineId: 'p-1' })
+    expect(summary).toMatchObject({ method: 'GET', path: '/crm/deals/summary' })
+    expect(summary.options.root).toBe(true)
+    expect(summary.options.query).toMatchObject({ pipelineId: 'p-1' })
+
+    const limits = await callTool('get_deal_limits')
+    expect(limits).toMatchObject({ method: 'GET', path: '/crm/deals/limits' })
+    expect(limits.options.root).toBe(true)
+
+    const candidates = await callTool('find_duplicate_deals', { dealId: 'd-1' })
+    expect(candidates).toMatchObject({ method: 'GET', path: '/crm/deals/d-1/duplicate-candidates' })
+    expect(candidates.options.root).toBe(true)
+
+    const suggestions = await callTool('get_deal_contact_suggestions', { dealId: 'd-1' })
+    expect(suggestions).toMatchObject({ method: 'GET', path: '/crm/deals/d-1/contact-suggestions' })
+    expect(suggestions.options.root).toBe(true)
+
+    const merged = await callTool('merge_deals', { dealId: 'd-1', duplicateDealIds: ['d-2'] })
+    expect(merged).toMatchObject({ method: 'POST', path: '/crm/deals/d-1/merge' })
+    expect(merged.options.root).toBe(true)
+    expect(merged.options.body).toEqual({ duplicateDealIds: ['d-2'] })
+  })
+
+  it('bulk-imports deals with the row shape the API expects, pipelineId/stageId required', async () => {
+    const call = await callTool('bulk_import_deals', {
+      rows: [{ email: 'a@example.com', dealName: 'Muster GmbH' }],
+      pipelineId: 'p-1',
+      stageId: 's-1',
+    })
+    expect(call).toMatchObject({ method: 'POST', path: '/crm/deals/bulk-import' })
+    expect(call.options.root).toBe(true)
+    expect(call.options.body).toMatchObject({
+      rows: [{ email: 'a@example.com', dealName: 'Muster GmbH' }],
+      pipelineId: 'p-1',
+      stageId: 's-1',
+    })
+  })
+
   it('routes company tools to the host root, like the rest of the CRM', async () => {
     for (const [name, args] of [
       ['list_companies', {}],
@@ -785,6 +830,26 @@ describe('wire format', () => {
     expect(call).toMatchObject({ method: 'GET', path: '/crm/settings/custom-fields' })
     expect(call.options.root).toBe(true)
     expect(call.options.query).toMatchObject({ recordType: 'company' })
+  })
+
+  it('routes the task dashboard tools to their confirmed paths', async () => {
+    const summary = await callTool('get_task_summary', { assigneeId: 'u-1' })
+    expect(summary).toMatchObject({ method: 'GET', path: '/crm/tasks/summary' })
+    expect(summary.options.root).toBe(true)
+    expect(summary.options.query).toMatchObject({ assigneeId: 'u-1' })
+
+    const overdue = await callTool('list_overdue_tasks')
+    expect(overdue).toMatchObject({ method: 'GET', path: '/crm/tasks/overdue' })
+    expect(overdue.options.root).toBe(true)
+
+    const upcoming = await callTool('list_upcoming_tasks', { days: 7 })
+    expect(upcoming).toMatchObject({ method: 'GET', path: '/crm/tasks/upcoming' })
+    expect(upcoming.options.root).toBe(true)
+    expect(upcoming.options.query).toMatchObject({ days: 7 })
+
+    const byCompany = await callTool('list_company_tasks', { crmCompanyId: 'co-1' })
+    expect(byCompany).toMatchObject({ method: 'GET', path: '/crm/tasks/by-company/co-1' })
+    expect(byCompany.options.root).toBe(true)
   })
 
   it('filters search_contacts to an exact, case-insensitive email match', async () => {
