@@ -1551,7 +1551,7 @@ export const TOOLS: ToolDefinition[] = [
       customFields: z
         .record(z.unknown())
         .optional()
-        .describe('Keyed by field key from list_data_fields'),
+        .describe('Keyed by the exact-case key from get_custom_field_definitions'),
     },
     readOnly: false,
     run: (client, body) =>
@@ -1580,7 +1580,7 @@ export const TOOLS: ToolDefinition[] = [
       customFields: z
         .record(z.unknown().nullable())
         .optional()
-        .describe('Keyed by field key from list_data_fields; null removes a key'),
+        .describe('Keyed by the exact-case key from get_custom_field_definitions; null removes a key'),
     },
     readOnly: false,
     run: (client, { crmCompanyId, ...body }) =>
