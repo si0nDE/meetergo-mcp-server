@@ -1634,6 +1634,18 @@ export const TOOLS: ToolDefinition[] = [
     run: (client, args) =>
       client.request('GET', '/crm/companies/summary', { query: args, root: true }),
   },
+  {
+    name: 'get_custom_field_definitions',
+    title: 'Get custom field definitions',
+    description:
+      "Return the configured custom fields on CRM companies or deals: key, label, type, required and — for a multiselect field — its fixed option list. Look this up before writing customFields when creating or updating a company or deal: a misspelled or wrong-cased key is not rejected, it is silently stored as an extra key nobody sees. This is a separate system from the booking-form fields tool, which covers contacts, not companies or deals.",
+    schema: {
+      recordType: z.enum(['company', 'deal']).optional().describe('Defaults to deal'),
+    },
+    readOnly: true,
+    run: (client, args) =>
+      client.request('GET', '/crm/settings/custom-fields', { query: args, root: true }),
+  },
 
   // ---- Communications -------------------------------------------------------
   {
@@ -1768,10 +1780,10 @@ export const TOOLS: ToolDefinition[] = [
     name: 'create_task',
     title: 'Create a task',
     description:
-      'Create a CRM task, optionally linked to a company, deal or contact. type is checked server-side, not here — confirmed values are call, follow_up, email and meeting, but the API may accept others the server never tried; an invalid value comes back as the API\'s own "type must be a valid enum value". A bad crmCompanyId/dealId/contactId is validated too and comes back as its own 400, e.g. "Deal not found or does not belong to your company".',
+      'Create a CRM task, optionally linked to a company, deal or contact. type is checked server-side, not here — confirmed values are call, follow_up, email, meeting and todo, but the API may accept others the server never tried; an invalid value comes back as the API\'s own "type must be a valid enum value". A bad crmCompanyId/dealId/contactId is validated too and comes back as its own 400, e.g. "Deal not found or does not belong to your company".',
     schema: {
       title: z.string(),
-      type: z.string().describe('e.g. call, follow_up, email or meeting'),
+      type: z.string().describe('e.g. call, follow_up, email, meeting or todo'),
       dueDate: z.string().describe('ISO 8601'),
       description: z.string().optional(),
       crmCompanyId: z.string().optional(),
@@ -1785,11 +1797,11 @@ export const TOOLS: ToolDefinition[] = [
     name: 'update_task',
     title: 'Update a task',
     description:
-      'Update a CRM task. Only supplied fields change. Marking a task done is deliberately not offered: completed, status, isCompleted and completedAt were all tested and the API accepts them with HTTP 200 but silently ignores them.',
+      'Update a CRM task. Only supplied fields change. completed, status, isCompleted and completedAt are silently ignored here — the API accepts them with HTTP 200 but never applies them; mark a task done or reopen it with the dedicated complete/reopen tools instead.',
     schema: {
       taskId: z.string(),
       title: z.string().optional(),
-      type: z.string().optional().describe('e.g. call, follow_up, email or meeting'),
+      type: z.string().optional().describe('e.g. call, follow_up, email, meeting or todo'),
       dueDate: z.string().optional().describe('ISO 8601'),
       description: z.string().optional(),
       crmCompanyId: z.string().optional(),
@@ -1799,6 +1811,25 @@ export const TOOLS: ToolDefinition[] = [
     readOnly: false,
     run: (client, { taskId, ...body }) =>
       client.request('PATCH', `/crm/tasks/${taskId}`, { body, root: true }),
+  },
+  {
+    name: 'complete_task',
+    title: 'Mark a task done',
+    description:
+      'Mark a task complete via its own endpoint. No body: the API sets completed and completedAt itself.',
+    schema: { taskId: z.string() },
+    readOnly: false,
+    run: (client, { taskId }) =>
+      client.request('PATCH', `/crm/tasks/${taskId}/complete`, { root: true }),
+  },
+  {
+    name: 'uncomplete_task',
+    title: 'Reopen a completed task',
+    description: 'Undo a completed task, clearing completed and completedAt. No body needed.',
+    schema: { taskId: z.string() },
+    readOnly: false,
+    run: (client, { taskId }) =>
+      client.request('PATCH', `/crm/tasks/${taskId}/uncomplete`, { root: true }),
   },
   {
     name: 'delete_task',

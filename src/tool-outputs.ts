@@ -271,6 +271,19 @@ const task = out(
 // empty attachments list — so the shape of a real entry is unconfirmed.
 const attachment = record.describe('An attachment on a company; fields unconfirmed, never seen populated')
 
+const customFieldDefinition = out(
+  {
+    id: str,
+    key: str.describe('The exact-case key to write under customFields'),
+    label: str,
+    type: str.describe('e.g. multiselect'),
+    required: bool,
+    options: list(z.string()).describe('Valid values, for a multiselect field'),
+    order: num,
+  },
+  'A custom field configured on CRM companies or deals',
+)
+
 const dealActivity = out(
   {
     id: str,
@@ -658,6 +671,10 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
     },
     'Company counts and pipeline value, grouped by industry and size',
   ),
+  get_custom_field_definitions: out(
+    { fields: list(customFieldDefinition) },
+    'Custom field definitions for the record type',
+  ),
   get_deal_communications: listOf(communication, "A deal's logged communications"),
   create_communication: communication,
   delete_communication: ok,
@@ -678,6 +695,8 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
   get_task: task,
   create_task: task,
   update_task: task,
+  complete_task: task,
+  uncomplete_task: task,
   delete_task: ok,
   list_webhooks: listOf(webhook, 'Webhook subscriptions of the company'),
   create_webhook: webhook,

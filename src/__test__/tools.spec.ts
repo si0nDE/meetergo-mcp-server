@@ -8,7 +8,7 @@ import { TOOLS, sanitizeMiraSettingsForPatch } from '../tools.js'
  */
 describe('meetergo MCP tool surface', () => {
   it('covers the API surface an agent needs, with no duplicate names', () => {
-    expect(TOOLS).toHaveLength(88)
+    expect(TOOLS).toHaveLength(91)
     expect(new Set(TOOLS.map((t) => t.name)).size).toBe(TOOLS.length)
   })
 
@@ -55,6 +55,7 @@ describe('meetergo MCP tool surface', () => {
       'book_appointment',
       'bulk_create_contacts',
       'cancel_appointment',
+      'complete_task',
       'crawl_company_website',
       'create_communication',
       'create_company',
@@ -90,6 +91,7 @@ describe('meetergo MCP tool surface', () => {
       'run_test_drive',
       'send_quick_email',
       'send_routing_form',
+      'uncomplete_task',
       'update_appointment_notes',
       'update_company',
       'update_contact',
@@ -762,6 +764,27 @@ describe('wire format', () => {
     const deleted = await callTool('delete_task', { taskId: 'task-1' })
     expect(deleted).toMatchObject({ method: 'DELETE', path: '/crm/tasks/task-1' })
     expect(deleted.options.root).toBe(true)
+  })
+
+  it('marks a task done and reopens it on their own sub-endpoints, with no body', async () => {
+    // update_task's own PATCH silently ignores completed/status/etc — these
+    // dedicated endpoints are the only way that actually works.
+    const completed = await callTool('complete_task', { taskId: 'task-1' })
+    expect(completed).toMatchObject({ method: 'PATCH', path: '/crm/tasks/task-1/complete' })
+    expect(completed.options.root).toBe(true)
+    expect(completed.options.body).toBeUndefined()
+
+    const reopened = await callTool('uncomplete_task', { taskId: 'task-1' })
+    expect(reopened).toMatchObject({ method: 'PATCH', path: '/crm/tasks/task-1/uncomplete' })
+    expect(reopened.options.root).toBe(true)
+    expect(reopened.options.body).toBeUndefined()
+  })
+
+  it('reads custom field definitions, defaulting recordType to the API default', async () => {
+    const call = await callTool('get_custom_field_definitions', { recordType: 'company' })
+    expect(call).toMatchObject({ method: 'GET', path: '/crm/settings/custom-fields' })
+    expect(call.options.root).toBe(true)
+    expect(call.options.query).toMatchObject({ recordType: 'company' })
   })
 
   it('filters search_contacts to an exact, case-insensitive email match', async () => {

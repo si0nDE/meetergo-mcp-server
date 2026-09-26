@@ -920,6 +920,18 @@
         "destructive_justification": "Read-only; nothing is changed or removed."
       }
     },
+    "get_custom_field_definitions": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Lists the configured custom field definitions for CRM companies or deals.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
     "get_deal_communications": {
       "annotations": {
         "readOnlyHint": true,
@@ -1050,6 +1062,30 @@
         "read_only_justification": "Updates fields on an existing CRM task, such as its title or due date.",
         "open_world_justification": "Operates only on this account's own private data in meetergo.",
         "destructive_justification": "Only the fields supplied change; nothing is deleted."
+      }
+    },
+    "complete_task": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Marks a CRM task complete via its dedicated endpoint.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Reversible: uncomplete_task undoes it."
+      }
+    },
+    "uncomplete_task": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Reopens a completed CRM task via its dedicated endpoint.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Reversible: complete_task undoes it."
       }
     },
     "delete_task": {

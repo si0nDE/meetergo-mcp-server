@@ -10,7 +10,7 @@ change anything. Both are useful and they do different jobs:
 | | Docs MCP | This server |
 |---|---|---|
 | Endpoint | `developer.meetergo.com/mcp` | `mcp.meetergo.com/mcp`, or `npx` over stdio |
-| Tools | `SearchMeetergo` | 88 scheduling, CRM, Mira and config tools |
+| Tools | `SearchMeetergo` | 91 scheduling, CRM, Mira and config tools |
 | Can it book? | No | **Yes** |
 | Use it to | write an integration | be the integration |
 
@@ -203,7 +203,7 @@ server itself is never gated — a token from any plan, including Free, works.
 
 ## Tools
 
-88 tools, covering scheduling end to end. **Scheduling** is the loop most agents
+91 tools, covering scheduling end to end. **Scheduling** is the loop most agents
 live in; the rest is there so an agent never has to fall back to raw REST.
 
 ### Scheduling
@@ -300,6 +300,13 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 | `get_company_contacts` | | Contacts linked to a company |
 | `get_company_deals` | | Deals linked to a company, across every pipeline |
 | `get_company_summary` | | Company counts and pipeline value, grouped by industry and size |
+| `get_custom_field_definitions` | | Custom field definitions on companies or deals — key, label, type, required, and the option list for a multiselect field |
+
+`get_custom_field_definitions` is a separate system from `list_data_fields`
+(booking-form fields on contacts). Look it up before writing `customFields` on
+`create_company`/`update_company`/`create_deal`/`update_deal`: a misspelled or
+wrong-cased key is not rejected — it is silently stored as an extra key
+nobody sees.
 
 ### Communications
 
@@ -340,12 +347,15 @@ saves anything, so it's deliberately not wired up either.
 |---|---|---|
 | `list_tasks` | | Paginated CRM tasks, optionally scoped to a company, deal or contact |
 | `get_task` | | One task in full, including its assignee and linked company, deal or contact |
-| `create_task` | **yes** | Create a task; `type` and `dueDate` are required, linking to a company/deal/contact is optional |
+| `create_task` | **yes** | Create a task; `type` (`call`/`follow_up`/`email`/`meeting`/`todo`, confirmed) and `dueDate` are required, linking to a company/deal/contact is optional |
 | `update_task` | **yes** | Change title, type, due date, description or linked company/deal/contact |
+| `complete_task` | **yes** | Mark a task done, on its own endpoint — no body |
+| `uncomplete_task` | **yes** | Reopen a completed task, on its own endpoint — no body |
 | `delete_task` | **destructive** | Permanently delete a task |
 
-Marking a task done isn't offered: `completed`, `status`, `isCompleted` and
-`completedAt` all return HTTP 200 but are silently ignored by the API.
+`completed`, `status`, `isCompleted` and `completedAt` are silently ignored on
+`update_task` itself — HTTP 200, no effect. `complete_task`/`uncomplete_task`
+are the only endpoints that actually flip it.
 
 ### Mira, the website assistant
 
