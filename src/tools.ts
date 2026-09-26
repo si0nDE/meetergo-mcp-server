@@ -137,6 +137,17 @@ const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001+'
 const COMMUNICATION_TYPES = ['whatsapp', 'email', 'call', 'sms'] as const
 const COMMUNICATION_DIRECTIONS = ['inbound', 'outbound'] as const
 const COMMUNICATION_OUTCOMES = ['connected', 'no_answer', 'voicemail', 'busy'] as const
+const contactAddressSchema = z
+  .object({
+    line1: z.string().max(255).optional(),
+    line2: z.string().max(255).optional(),
+    line3: z.string().max(255).optional(),
+    city: z.string().max(255).optional(),
+    zip: z.string().max(32).optional(),
+    country: z.string().max(255).optional(),
+  })
+  .optional()
+
 const CONTACT_ACTIVITY_TYPES = [
   'meeting',
   'email',
@@ -845,6 +856,13 @@ export const TOOLS: ToolDefinition[] = [
       notes: z.string().optional().describe('Internal notes, not visible to the contact'),
       accountOwnerId: z.string().optional(),
       crmCompanyId: z.string().optional(),
+      address: contactAddressSchema,
+      additionalData: z
+        .record(z.unknown())
+        .optional()
+        .describe(
+          'Custom field values keyed by the exact-case name from list_data_fields. Not validated against the field definitions — a misspelled key is silently stored, not rejected.',
+        ),
     },
     readOnly: false,
     run: async (client, args) => {
@@ -861,7 +879,7 @@ export const TOOLS: ToolDefinition[] = [
     name: 'update_contact',
     title: 'Update a contact',
     description:
-      'Update a CRM contact. Only supplied fields change. Tags replace the existing list rather than merging, so retained tags must be included. Pass crmCompanyId to link to a company, or null to remove the link.',
+      "Update a CRM contact. Only supplied fields change. Tags replace the existing list rather than merging, so retained tags must be included. Pass crmCompanyId to link to a company, or null to remove the link. title/employer/seniority/function/location are the fields an automated research feature suggests and a person corrects — editing one here marks it human-owned, so the research feature stops overwriting it.",
     schema: {
       contactId: z.string(),
       firstName: z.string().optional(),
@@ -872,6 +890,19 @@ export const TOOLS: ToolDefinition[] = [
       notes: z.string().optional(),
       accountOwnerId: z.string().optional(),
       crmCompanyId: z.string().nullable().optional(),
+      language: z.string().max(8).optional().describe('ISO 639-1, e.g. "de"'),
+      address: contactAddressSchema,
+      title: z.string().optional(),
+      employer: z.string().optional(),
+      seniority: z.string().optional(),
+      function: z.string().optional(),
+      location: z.string().optional(),
+      additionalData: z
+        .record(z.unknown().nullable())
+        .optional()
+        .describe(
+          'Custom field values keyed by the exact-case name from list_data_fields, merged into what exists — a key set to null removes it. Not validated against the field definitions — a misspelled key is silently stored, not rejected.',
+        ),
     },
     readOnly: false,
     // Tags replace rather than merge — a careless call silently drops data.
@@ -1505,6 +1536,50 @@ export const TOOLS: ToolDefinition[] = [
     readOnly: false,
     run: (client, { dealId, ...body }) =>
       client.request('PATCH', `/crm/deals/${dealId}`, { body, root: true }),
+  },
+  {
+    name: 'add_deal_contact',
+    title: 'Add a contact to a deal',
+    description:
+      "Link another contact to a deal with a role — decision_maker, influencer, user, primary or other — beyond the deal's single contactId. Reading a deal already embeds the resulting contacts array with each role.",
+    schema: {
+      dealId: z.string(),
+      contactId: z.string(),
+      role: z.enum(DEAL_CONTACT_ROLES).optional(),
+      isPrimary: z.boolean().optional(),
+    },
+    readOnly: false,
+    run: (client, { dealId, ...body }) =>
+      client.request('POST', `/crm/deals/${dealId}/contacts`, { body, root: true }),
+  },
+  {
+    name: 'update_deal_contact',
+    title: "Change a deal contact's role",
+    description:
+      "Change the role or primary flag of a contact already linked to a deal. dealContactId is the link's own id, from the deal's embedded contacts array — not the contactId itself.",
+    schema: {
+      dealId: z.string(),
+      dealContactId: z.string(),
+      role: z.enum(DEAL_CONTACT_ROLES).optional(),
+      isPrimary: z.boolean().optional(),
+    },
+    readOnly: false,
+    run: (client, { dealId, dealContactId, ...body }) =>
+      client.request('PATCH', `/crm/deals/${dealId}/contacts/${dealContactId}`, { body, root: true }),
+  },
+  {
+    name: 'remove_deal_contact',
+    title: 'Remove a contact from a deal',
+    description:
+      "Unlink a contact from a deal. dealContactId is the link's own id, from the deal's embedded contacts array — not the contactId itself. The contact record and the deal itself are untouched.",
+    schema: {
+      dealId: z.string(),
+      dealContactId: z.string(),
+    },
+    readOnly: false,
+    destructive: true,
+    run: (client, { dealId, dealContactId }) =>
+      client.request('DELETE', `/crm/deals/${dealId}/contacts/${dealContactId}`, { root: true }),
   },
   {
     name: 'delete_deal',

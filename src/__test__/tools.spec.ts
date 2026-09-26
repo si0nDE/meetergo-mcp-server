@@ -8,7 +8,7 @@ import { TOOLS, sanitizeMiraSettingsForPatch } from '../tools.js'
  */
 describe('meetergo MCP tool surface', () => {
   it('covers the API surface an agent needs, with no duplicate names', () => {
-    expect(TOOLS).toHaveLength(107)
+    expect(TOOLS).toHaveLength(110)
     expect(new Set(TOOLS.map((t) => t.name)).size).toBe(TOOLS.length)
   })
 
@@ -50,6 +50,7 @@ describe('meetergo MCP tool surface', () => {
     // Hosts gate confirmation on readOnlyHint. Mislabelling a write as a read
     // means an agent books, cancels or deletes without anyone being asked.
     expect(writes).toEqual([
+      'add_deal_contact',
       'add_guest',
       'answer_visitor_question',
       'book_appointment',
@@ -84,6 +85,7 @@ describe('meetergo MCP tool surface', () => {
       'mark_deal_lost',
       'mark_deal_won',
       'merge_deals',
+      'remove_deal_contact',
       'reopen_deal',
       'reschedule_appointment',
       'restore_mira_settings',
@@ -98,6 +100,7 @@ describe('meetergo MCP tool surface', () => {
       'update_company',
       'update_contact',
       'update_deal',
+      'update_deal_contact',
       'update_meeting_transcription',
       'update_meeting_type',
       'update_mira_settings',
@@ -130,6 +133,7 @@ describe('meetergo MCP tool surface', () => {
       'delete_task',
       'delete_webhook',
       'merge_deals',
+      'remove_deal_contact',
       'reschedule_appointment',
       'restore_mira_settings',
       'send_quick_email',
@@ -268,6 +272,7 @@ describe('meetergo MCP tool surface', () => {
       'communicationId',
       'noteId',
       'taskId',
+      'dealContactId',
     ]
     // Company-scoped singletons: there is exactly one target (the caller's own
     // page / the company's Mira config / its knowledge base), so no id exists.
@@ -560,6 +565,31 @@ describe('wire format', () => {
     expect(call.options.body).not.toHaveProperty('name')
   })
 
+  it('manages deal contacts on their own nested endpoints', async () => {
+    const added = await callTool('add_deal_contact', {
+      dealId: 'd-1',
+      contactId: 'c-1',
+      role: 'decision_maker',
+    })
+    expect(added).toMatchObject({ method: 'POST', path: '/crm/deals/d-1/contacts' })
+    expect(added.options.root).toBe(true)
+    expect(added.options.body).toMatchObject({ contactId: 'c-1', role: 'decision_maker' })
+    expect(added.options.body).not.toHaveProperty('dealId')
+
+    const updated = await callTool('update_deal_contact', {
+      dealId: 'd-1',
+      dealContactId: 'dc-1',
+      isPrimary: true,
+    })
+    expect(updated).toMatchObject({ method: 'PATCH', path: '/crm/deals/d-1/contacts/dc-1' })
+    expect(updated.options.root).toBe(true)
+    expect(updated.options.body).toEqual({ isPrimary: true })
+
+    const removed = await callTool('remove_deal_contact', { dealId: 'd-1', dealContactId: 'dc-1' })
+    expect(removed).toMatchObject({ method: 'DELETE', path: '/crm/deals/d-1/contacts/dc-1' })
+    expect(removed.options.root).toBe(true)
+  })
+
   it('lets update_contact clear crmCompanyId with an explicit null, not just omit it', async () => {
     // UpdateContactDto: `null` clears the linked company; omitting the key
     // leaves it unchanged.
@@ -576,6 +606,33 @@ describe('wire format', () => {
     })
     expect(call).toMatchObject({ method: 'POST', path: '/crm' })
     expect(call.options.body).toMatchObject({ crmCompanyId: 'co-1' })
+  })
+
+  it('lets create_contact/update_contact set address, research fields and additionalData', async () => {
+    const created = await callTool('create_contact', {
+      email: 'a@example.com',
+      address: { city: 'Rimpar', country: 'Deutschland' },
+      additionalData: { source: 'messe' },
+    })
+    expect(created.options.body).toMatchObject({
+      address: { city: 'Rimpar', country: 'Deutschland' },
+      additionalData: { source: 'messe' },
+    })
+
+    const updated = await callTool('update_contact', {
+      contactId: 'c-1',
+      language: 'de',
+      title: 'Geschäftsführer',
+      employer: 'Muster GmbH',
+      additionalData: { source: null },
+    })
+    expect(updated).toMatchObject({ method: 'PATCH', path: '/crm/c-1' })
+    expect(updated.options.body).toMatchObject({
+      language: 'de',
+      title: 'Geschäftsführer',
+      employer: 'Muster GmbH',
+      additionalData: { source: null },
+    })
   })
 
   it('sends the won/lost/reopen bodies their own DTOs expect', async () => {

@@ -584,6 +584,42 @@
         "destructive_justification": "Only the fields supplied change; nothing is deleted."
       }
     },
+    "add_deal_contact": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Links an additional contact to a deal with a role.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Adds a record; nothing existing is changed or removed."
+      }
+    },
+    "update_deal_contact": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Changes the role or primary flag of a contact already linked to a deal.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Only the fields supplied change; nothing is deleted."
+      }
+    },
+    "remove_deal_contact": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Unlinks a contact from a deal.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Permanently removes the link; the contact and deal themselves are untouched."
+      }
+    },
     "delete_deal": {
       "annotations": {
         "readOnlyHint": false,

@@ -10,7 +10,7 @@ change anything. Both are useful and they do different jobs:
 | | Docs MCP | This server |
 |---|---|---|
 | Endpoint | `developer.meetergo.com/mcp` | `mcp.meetergo.com/mcp`, or `npx` over stdio |
-| Tools | `SearchMeetergo` | 107 scheduling, CRM, Mira and config tools |
+| Tools | `SearchMeetergo` | 110 scheduling, CRM, Mira and config tools |
 | Can it book? | No | **Yes** |
 | Use it to | write an integration | be the integration |
 
@@ -203,7 +203,7 @@ server itself is never gated — a token from any plan, including Free, works.
 
 ## Tools
 
-107 tools, covering scheduling end to end. **Scheduling** is the loop most agents
+110 tools, covering scheduling end to end. **Scheduling** is the loop most agents
 live in; the rest is there so an agent never has to fall back to raw REST.
 
 ### Scheduling
@@ -267,8 +267,8 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 |---|---|---|
 | `search_contacts` | | Find a contact before creating a duplicate |
 | `get_contact` | | Full record, by `contactId` or by `attendeeId` from a booking |
-| `create_contact` | **yes** | Add a contact |
-| `update_contact` | **yes** | Edit a contact |
+| `create_contact` | **yes** | Add a contact; also takes `address` and `additionalData` |
+| `update_contact` | **yes** | Edit a contact, including `language`, `address`, `additionalData` and the research-suggested `title`/`employer`/`seniority`/`function`/`location` |
 | `bulk_create_contacts` | **yes** | Import many at once (3 calls per min) |
 | `delete_contact` | **destructive** | Remove a contact and its form answers |
 | `get_contact_timeline` | | Unified activity feed — meetings, synced emails, forms, notes, tasks, communications — merged and cursor-paginated |
@@ -281,6 +281,11 @@ There is no send endpoint: draft the email as text in the reply and let the
 human send it. `get_contact_timeline` is the compact way to answer "what's
 happened with this lead so far" instead of reading notes, tasks and emails
 separately.
+
+`additionalData` on `create_contact`/`update_contact` is the contact-level
+custom field system behind `list_data_fields` — same trap as company/deal
+`customFields`: a misspelled or wrong-cased key is not rejected, it's
+silently stored as an extra key nobody sees.
 
 A contact row with `crmCompanyRef` also auto-creates a separate, unlisted
 `ContactCompany` record from its email domain if that domain hasn't been seen
@@ -306,12 +311,22 @@ view or remove them.
 | `get_deal_limits` | | Deal count against the plan limit (`-1` = unlimited) |
 | `find_duplicate_deals` | | Deals that look like duplicates of a given deal, with a match score |
 | `get_deal_contact_suggestions` | | Contacts a deal is probably about, when none is linked yet |
+| `add_deal_contact` | **yes** | Link another contact to a deal with a role (decision_maker, influencer, user, primary, other) |
+| `update_deal_contact` | **yes** | Change a linked contact's role or primary flag |
+| `remove_deal_contact` | **destructive** | Unlink a contact from a deal |
 | `merge_deals` | **destructive** | Merge duplicates into a survivor; the merged-in deals are permanently deleted |
 | `bulk_import_deals` | **yes** | Upsert contacts and create one deal per row, into one pipeline stage (max 500 rows) |
 
 `bulk_import_deals` has the same `crmCompanyRef` orphan-record caveat as
 `bulk_create_contacts` above. Look up and confirm duplicates with
 `find_duplicate_deals` before calling `merge_deals` — it cannot be undone.
+
+`create_deal`'s `contacts` array covers adding contacts with a role only at
+creation time; `add_deal_contact`/`update_deal_contact`/`remove_deal_contact`
+cover the same afterwards, e.g. when a second decision-maker joins mid-deal.
+`get_deal` always embeds the current contacts array, so a `dealContactId` for
+`update_deal_contact`/`remove_deal_contact` comes from reading that first —
+it is the link's own id, not the contact's.
 
 ### Companies
 

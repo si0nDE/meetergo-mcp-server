@@ -113,6 +113,15 @@ const contact = out(
     tags: list(z.unknown()),
     notes: str,
     accountOwnerId: str,
+    crmCompanyId: str,
+    language: str.describe('ISO 639-1, e.g. de'),
+    address: record.nullable().optional(),
+    title: str.describe('Research-suggested until a person edits it'),
+    employer: str,
+    seniority: str,
+    function: str,
+    location: str,
+    additionalData: record.nullable().optional().describe('Custom field values, keyed by name from list_data_fields'),
     createdAt: str,
   },
   'A CRM contact',
@@ -166,6 +175,19 @@ const dealSignal = out(
     computedAt: str,
   },
   'Server-computed deal health, attached to every deal read',
+)
+
+const dealContact = out(
+  {
+    id: str.describe('The dealContactId update_deal_contact/remove_deal_contact take'),
+    dealId: str,
+    contactId: str,
+    role: str.describe('primary, decision_maker, influencer, user or other'),
+    isPrimary: bool,
+    contact: record.nullable().optional(),
+    createdAt: str,
+  },
+  "One contact's link to a deal, with its role",
 )
 
 const deal = out(
@@ -722,6 +744,9 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
   get_deal: deal,
   create_deal: deal,
   update_deal: deal,
+  add_deal_contact: dealContact,
+  update_deal_contact: dealContact,
+  remove_deal_contact: ok,
   delete_deal: ok,
   mark_deal_won: deal,
   mark_deal_lost: deal,
