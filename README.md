@@ -353,6 +353,12 @@ off — the first time a deal enters a stage marked `start`/`demo`/`offer`
 becomes its opportunity-start/first-demo/first-quote date. Those reports
 show no data until at least one stage in the pipeline carries a milestone.
 
+`update_pipeline_stage`'s own response isn't reliably complete — a field
+left untouched has come back `null` even though the change never happened;
+confirmed by re-reading `list_pipelines` right after. Re-read the pipeline
+list for a stage's actual current state rather than trusting this call's
+response.
+
 ### Companies
 
 | Tool | Writes? | Purpose |

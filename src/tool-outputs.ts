@@ -29,6 +29,10 @@ import { z } from 'zod'
 const str = z.string().nullable().optional()
 const bool = z.boolean().nullable().optional()
 const num = z.number().nullable().optional()
+// Data-field ids are numeric on this API, unlike every uuid string id
+// elsewhere — confirmed live after create_data_field/update_data_field's
+// structuredContent validation rejected the real numeric id as a string.
+const numOrStr = z.union([z.string(), z.number()]).nullable().optional()
 const any = (description: string) => z.unknown().optional().describe(description)
 const record = z.object({}).passthrough()
 const list = <T extends z.ZodTypeAny>(item: T) => z.array(item).nullable().optional()
@@ -422,7 +426,7 @@ const routingForm = out(
 
 const dataField = out(
   {
-    id: str,
+    id: numOrStr,
     label: str,
     name: str.describe('The exact key customFields expects when writing to this field'),
     fieldType: str,

@@ -1404,7 +1404,11 @@ export const TOOLS: ToolDefinition[] = [
     description: 'Show where a reusable form field is actually used, before editing or deleting it.',
     schema: { fieldId: z.number().describe('Numeric id, from list_data_fields') },
     readOnly: true,
-    run: (client, { fieldId }) => client.request('GET', `/data-field/${fieldId}/usage`, {}),
+    // Unlike the rest of /data-field (mounted under /v4), this one route
+    // lives at the host root — confirmed live: /v4/data-field/{id}/usage
+    // 404s, root: true (plain /data-field/{id}/usage) works.
+    run: (client, { fieldId }) =>
+      client.request('GET', `/data-field/${fieldId}/usage`, { root: true }),
   },
   {
     name: 'reorder_data_fields',
@@ -1616,7 +1620,7 @@ export const TOOLS: ToolDefinition[] = [
     name: 'update_pipeline_stage',
     title: 'Update a pipeline stage',
     description:
-      'Change a stage: name, color, won/lost flags, win probability, rotting threshold, required custom fields, or its salesMilestone (start/demo/offer, or null to clear it). Only supplied fields change.',
+      "Change a stage: name, color, won/lost flags, win probability, rotting threshold, required custom fields, or its salesMilestone (start/demo/offer, or null to clear it). Only supplied fields change. The response itself isn't reliably complete — a field left untouched has come back null here even though it was unchanged; re-read the pipeline list for the actual current state rather than trusting this call's own response.",
     schema: {
       pipelineId: z.string(),
       stageId: z.string(),

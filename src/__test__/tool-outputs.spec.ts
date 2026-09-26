@@ -65,6 +65,18 @@ describe('tool output schemas', () => {
     }
   })
 
+  it('accepts a numeric data-field id, unlike the uuid strings every other id is', () => {
+    // Live bug: create_data_field/update_data_field threw "Expected string,
+    // received number at id" even though the write itself succeeded — every
+    // data-field id from the real API is numeric (295521, 297171, ...), not
+    // a uuid string like the rest of this API's ids.
+    for (const name of ['create_data_field', 'update_data_field', 'reorder_data_fields'] as const) {
+      const sample = name === 'reorder_data_fields' ? { items: [{ id: 297171 }] } : { id: 297171 }
+      const parsed = TOOL_OUTPUTS[name].safeParse(sample)
+      expect(parsed.success, `${name}: ${parsed.success ? '' : parsed.error.message}`).toBe(true)
+    }
+  })
+
   it('match the shapes this server computes itself', () => {
     expect(
       TOOL_OUTPUTS.get_setup_status.safeParse(

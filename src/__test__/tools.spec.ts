@@ -655,8 +655,11 @@ describe('wire format', () => {
     expect(updated.options.root).toBeUndefined()
     expect(updated.options.body).toEqual({ label: 'Neuer Name' })
 
+    // Unlike the rest of /data-field, usage lives at the host root, not /v4
+    // — confirmed live after a 404 on the /v4-prefixed path.
     const usage = await callTool('get_data_field_usage', { fieldId: 42 })
     expect(usage).toMatchObject({ method: 'GET', path: '/data-field/42/usage' })
+    expect(usage.options.root).toBe(true)
 
     const deleted = await callTool('delete_data_field', { fieldId: 42 })
     expect(deleted).toMatchObject({ method: 'DELETE', path: '/data-field/42' })
