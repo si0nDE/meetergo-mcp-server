@@ -707,6 +707,10 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
     'Result counts from the bulk contact import',
   ),
   delete_contact: ok,
+  bulk_delete_contacts: out(
+    { requested: num, deleted: num, skipped: num },
+    'Counts from a bulk contact deletion',
+  ),
   get_contact_timeline: out(
     { items: list(contactActivityItem), nextCursor: str, hasMore: bool },
     "A contact's unified activity timeline, cursor-paginated",

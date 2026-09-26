@@ -10,7 +10,7 @@ change anything. Both are useful and they do different jobs:
 | | Docs MCP | This server |
 |---|---|---|
 | Endpoint | `developer.meetergo.com/mcp` | `mcp.meetergo.com/mcp`, or `npx` over stdio |
-| Tools | `SearchMeetergo` | 110 scheduling, CRM, Mira and config tools |
+| Tools | `SearchMeetergo` | 111 scheduling, CRM, Mira and config tools |
 | Can it book? | No | **Yes** |
 | Use it to | write an integration | be the integration |
 
@@ -203,7 +203,7 @@ server itself is never gated — a token from any plan, including Free, works.
 
 ## Tools
 
-110 tools, covering scheduling end to end. **Scheduling** is the loop most agents
+111 tools, covering scheduling end to end. **Scheduling** is the loop most agents
 live in; the rest is there so an agent never has to fall back to raw REST.
 
 ### Scheduling
@@ -271,6 +271,7 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 | `update_contact` | **yes** | Edit a contact, including `language`, `address`, `additionalData` and the research-suggested `title`/`employer`/`seniority`/`function`/`location` |
 | `bulk_create_contacts` | **yes** | Import many at once (3 calls per min) |
 | `delete_contact` | **destructive** | Remove a contact and its form answers |
+| `bulk_delete_contacts` | **destructive** | Delete up to 500 contacts in one call (3 calls per min) — the cleanup after a bad import or a round of test contacts |
 | `get_contact_timeline` | | Unified activity feed — meetings, synced emails, forms, notes, tasks, communications — merged and cursor-paginated |
 | `get_contact_emails` | | Synced email headers and previews for a contact |
 | `get_deal_emails` | | Synced email headers and previews for a deal |

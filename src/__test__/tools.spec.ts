@@ -8,7 +8,7 @@ import { TOOLS, sanitizeMiraSettingsForPatch } from '../tools.js'
  */
 describe('meetergo MCP tool surface', () => {
   it('covers the API surface an agent needs, with no duplicate names', () => {
-    expect(TOOLS).toHaveLength(110)
+    expect(TOOLS).toHaveLength(111)
     expect(new Set(TOOLS.map((t) => t.name)).size).toBe(TOOLS.length)
   })
 
@@ -55,6 +55,7 @@ describe('meetergo MCP tool surface', () => {
       'answer_visitor_question',
       'book_appointment',
       'bulk_create_contacts',
+      'bulk_delete_contacts',
       'bulk_import_deals',
       'cancel_appointment',
       'complete_task',
@@ -121,6 +122,7 @@ describe('meetergo MCP tool surface', () => {
       'add_guest',
       'answer_visitor_question',
       'book_appointment',
+      'bulk_delete_contacts',
       'cancel_appointment',
       'delete_communication',
       'delete_company',
@@ -273,6 +275,7 @@ describe('meetergo MCP tool surface', () => {
       'noteId',
       'taskId',
       'dealContactId',
+      'contactIds',
     ]
     // Company-scoped singletons: there is exactly one target (the caller's own
     // page / the company's Mira config / its knowledge base), so no id exists.
@@ -700,6 +703,13 @@ describe('wire format', () => {
       pipelineId: 'p-1',
       stageId: 's-1',
     })
+  })
+
+  it('bulk-deletes contacts on their own endpoint', async () => {
+    const call = await callTool('bulk_delete_contacts', { contactIds: ['c-1', 'c-2'] })
+    expect(call).toMatchObject({ method: 'POST', path: '/crm/bulk-delete' })
+    expect(call.options.root).toBe(true)
+    expect(call.options.body).toEqual({ contactIds: ['c-1', 'c-2'] })
   })
 
   it('routes company tools to the host root, like the rest of the CRM', async () => {

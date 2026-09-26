@@ -464,6 +464,18 @@
         "destructive_justification": "Permanently removes the contact record."
       }
     },
+    "bulk_delete_contacts": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Permanently deletes up to 500 contacts in one call.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Permanently removes the contacts; there is no undo."
+      }
+    },
     "get_contact_timeline": {
       "annotations": {
         "readOnlyHint": true,

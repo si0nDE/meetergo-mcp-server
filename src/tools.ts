@@ -1346,6 +1346,19 @@ export const TOOLS: ToolDefinition[] = [
       client.request('DELETE', `/crm/${contactId}`, { root: true }),
   },
   {
+    name: 'bulk_delete_contacts',
+    title: 'Bulk-delete contacts',
+    description:
+      'Permanently delete up to 500 contacts in one call — the natural cleanup after a bulk import that turns out wrong or premature, or after a round of test contacts. Only contacts belonging to this account are removed. Throttled to 3 calls per minute given the destructive effect; there is no undo.',
+    schema: {
+      contactIds: z.array(z.string()).min(1).max(500),
+    },
+    readOnly: false,
+    destructive: true,
+    run: (client, body) =>
+      client.request('POST', '/crm/bulk-delete', { body, root: true }),
+  },
+  {
     name: 'get_contact_timeline',
     title: "Get a contact's activity timeline",
     description:
