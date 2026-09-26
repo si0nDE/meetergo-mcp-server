@@ -613,7 +613,16 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
     },
     'A fresh single-use booking link',
   ),
-  search_contacts: listOf(contact, 'Matching CRM contacts'),
+  search_contacts: out(
+    {
+      result: list(contact),
+      total: any('Total matches'),
+      page: any('Current page'),
+      limit: any('Page size'),
+      totalPages: any('Total pages'),
+    },
+    'Paginated matching CRM contacts',
+  ),
   get_contact: out(
     {
       ...contact.shape,

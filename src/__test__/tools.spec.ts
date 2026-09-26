@@ -975,10 +975,13 @@ describe('wire format', () => {
   it('filters search_contacts to an exact, case-insensitive email match', async () => {
     // A generic searchTerm substring-matches; email is for a caller who has a
     // full address and wants exactly that contact, not near-misses.
+    // PaginatedContacts (the real response shape, per the OpenAPI spec) names
+    // the array `result` — a prior version of this filter checked `items`/
+    // `data` instead, which never matched, so it silently never filtered.
     const tool = TOOLS.find((t) => t.name === 'search_contacts')!
     const { client, calls } = record({
       '/crm': {
-        items: [
+        result: [
           { id: 'c-1', email: 'Info@Example.com' },
           { id: 'c-2', email: 'info@example.com.br' },
         ],
@@ -987,7 +990,7 @@ describe('wire format', () => {
     const result = await tool.run(client, { email: 'info@example.com' })
     expect(calls[0].options.query).toMatchObject({ searchTerm: 'info@example.com' })
     expect(calls[0].options.query).not.toHaveProperty('email')
-    expect(result).toMatchObject({ items: [{ id: 'c-1' }] })
+    expect(result).toMatchObject({ result: [{ id: 'c-1' }] })
   })
 
   it('leaves search_contacts on plain searchTerm when no email filter is given', async () => {

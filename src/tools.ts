@@ -809,6 +809,12 @@ export const TOOLS: ToolDefinition[] = [
       const isExactMatch = (contact: unknown) =>
         typeof (contact as { email?: unknown }).email === 'string' &&
         (contact as { email: string }).email.toLowerCase() === target
+      // PaginatedContacts names the array `result` — checked against the
+      // authoritative OpenAPI spec, not the earlier `items`/`data` guesses,
+      // which never matched and left this filter silently a no-op.
+      if (Array.isArray(result.result)) {
+        return { ...result, result: result.result.filter(isExactMatch) }
+      }
       if (Array.isArray(result.items)) {
         return { ...result, items: result.items.filter(isExactMatch) }
       }
