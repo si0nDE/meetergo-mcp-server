@@ -351,7 +351,7 @@ const task = out(
     priority: str,
     dueDate: str,
     reminderAt: str,
-    completed: bool.describe('Always false in practice: no confirmed way to set it true'),
+    completed: bool.describe('Set via complete_task/uncomplete_task, not update_task'),
     completedAt: str,
     assigneeId: str,
     companyId: str.describe("The meetergo tenant's own account id, not the CRM company"),

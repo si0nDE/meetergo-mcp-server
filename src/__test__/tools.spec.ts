@@ -878,6 +878,9 @@ describe('wire format', () => {
       type: 'call',
       dueDate: '2026-10-01T09:00:00.000Z',
       dealId: 'd-1',
+      priority: 'high',
+      reminderAt: '2026-09-30T09:00:00.000Z',
+      assigneeId: 'u-1',
     })
     expect(created).toMatchObject({ method: 'POST', path: '/crm/tasks' })
     expect(created.options.root).toBe(true)
@@ -886,16 +889,26 @@ describe('wire format', () => {
       type: 'call',
       dueDate: '2026-10-01T09:00:00.000Z',
       dealId: 'd-1',
+      priority: 'high',
+      reminderAt: '2026-09-30T09:00:00.000Z',
+      assigneeId: 'u-1',
     })
 
     const updated = await callTool('update_task', {
       taskId: 'task-1',
       title: 'Neuer Titel',
       contactId: 'c-1',
+      priority: 'low',
+      assigneeId: 'u-2',
     })
     expect(updated).toMatchObject({ method: 'PATCH', path: '/crm/tasks/task-1' })
     expect(updated.options.root).toBe(true)
-    expect(updated.options.body).toMatchObject({ title: 'Neuer Titel', contactId: 'c-1' })
+    expect(updated.options.body).toMatchObject({
+      title: 'Neuer Titel',
+      contactId: 'c-1',
+      priority: 'low',
+      assigneeId: 'u-2',
+    })
     expect(updated.options.body).not.toHaveProperty('taskId')
 
     const deleted = await callTool('delete_task', { taskId: 'task-1' })

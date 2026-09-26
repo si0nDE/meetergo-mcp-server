@@ -399,8 +399,8 @@ saves anything, so it's deliberately not wired up either.
 |---|---|---|
 | `list_tasks` | | Paginated CRM tasks, optionally scoped to a company, deal or contact |
 | `get_task` | | One task in full, including its assignee and linked company, deal or contact |
-| `create_task` | **yes** | Create a task; `type` (`call`/`follow_up`/`email`/`meeting`/`todo`, confirmed) and `dueDate` are required, linking to a company/deal/contact is optional |
-| `update_task` | **yes** | Change title, type, due date, description or linked company/deal/contact |
+| `create_task` | **yes** | Create a task; `type` (`call`/`follow_up`/`email`/`meeting`/`todo`, confirmed) and `dueDate` are required. Also takes `priority` (`low`/`medium`/`high`), `reminderAt`, `assigneeId`, and linking to a company/deal/contact |
+| `update_task` | **yes** | Change title, type, due date, description, priority, reminder, assignee or linked company/deal/contact |
 | `complete_task` | **yes** | Mark a task done, on its own endpoint — no body |
 | `uncomplete_task` | **yes** | Reopen a completed task, on its own endpoint — no body |
 | `delete_task` | **destructive** | Permanently delete a task |
