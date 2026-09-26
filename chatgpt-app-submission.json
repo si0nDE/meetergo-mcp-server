@@ -956,14 +956,14 @@
         "destructive_justification": "Permanently removes a record the user may still want."
       }
     },
-    "list_company_notes": {
+    "list_notes": {
       "annotations": {
         "readOnlyHint": true,
         "openWorldHint": false,
         "destructiveHint": false
       },
       "justifications": {
-        "read_only_justification": "Lists notes logged against a CRM company.",
+        "read_only_justification": "Lists notes logged against a CRM company, deal or contact.",
         "open_world_justification": "Operates only on this account's own private data in meetergo.",
         "destructive_justification": "Read-only; nothing is changed or removed."
       }

@@ -669,10 +669,16 @@ describe('wire format', () => {
     expect(deleted.options.root).toBe(true)
   })
 
-  it('routes note tools to the host root, on the company-scoped path', async () => {
-    const list = await callTool('list_company_notes', { crmCompanyId: 'co-1' })
-    expect(list).toMatchObject({ method: 'GET', path: '/crm/companies/co-1/notes' })
-    expect(list.options.root).toBe(true)
+  it('routes note tools to the host root, on the scoped path', async () => {
+    const byCompany = await callTool('list_notes', { crmCompanyId: 'co-1' })
+    expect(byCompany).toMatchObject({ method: 'GET', path: '/crm/companies/co-1/notes' })
+    expect(byCompany.options.root).toBe(true)
+
+    const byDeal = await callTool('list_notes', { dealId: 'd-1' })
+    expect(byDeal).toMatchObject({ method: 'GET', path: '/crm/deals/d-1/notes' })
+
+    const byContact = await callTool('list_notes', { contactId: 'c-1' })
+    expect(byContact).toMatchObject({ method: 'GET', path: '/crm/contacts/c-1/notes' })
 
     const created = await callTool('create_note', {
       crmCompanyId: 'co-1',
@@ -687,24 +693,35 @@ describe('wire format', () => {
     expect(deleted.options.root).toBe(true)
   })
 
-  it('rejects create_note unless exactly one of crmCompanyId, contactId or dealId is given', async () => {
-    // The API itself enforces this ("Exactly one of dealId, contactId, or
-    // crmCompanyId must be provided") — catching it here means a 400 doesn't
-    // read as a broken tool.
-    const tool = TOOLS.find((t) => t.name === 'create_note')!
+  it('rejects list_notes/create_note/list_attachments unless exactly one scope id is given', async () => {
+    // The API itself enforces this on create_note ("Exactly one of dealId,
+    // contactId, or crmCompanyId must be provided") — catching it (and doing
+    // the same for list_notes/list_attachments, which pick the request path
+    // client-side and have no server-side check of their own) means a 400
+    // doesn't read as a broken tool.
     const { client } = record()
-    await expect(tool.run(client, { content: 'hi' })).rejects.toThrow(
-      /exactly one of crmCompanyId, contactId or dealId/i,
-    )
-    await expect(
-      tool.run(client, { content: 'hi', crmCompanyId: 'co-1', dealId: 'd-1' }),
-    ).rejects.toThrow(/exactly one of crmCompanyId, contactId or dealId/i)
+    for (const name of ['list_notes', 'create_note', 'list_attachments']) {
+      const tool = TOOLS.find((t) => t.name === name)!
+      const base = name === 'create_note' ? { content: 'hi' } : {}
+      await expect(tool.run(client, base)).rejects.toThrow(
+        /exactly one of crmCompanyId, contactId or dealId/i,
+      )
+      await expect(
+        tool.run(client, { ...base, crmCompanyId: 'co-1', dealId: 'd-1' }),
+      ).rejects.toThrow(/exactly one of crmCompanyId, contactId or dealId/i)
+    }
   })
 
-  it('reads company attachments on the nested path, at the host root', async () => {
-    const call = await callTool('list_attachments', { crmCompanyId: 'co-1' })
-    expect(call).toMatchObject({ method: 'GET', path: '/crm/companies/co-1/attachments' })
-    expect(call.options.root).toBe(true)
+  it('reads attachments on the scoped path, at the host root', async () => {
+    const byCompany = await callTool('list_attachments', { crmCompanyId: 'co-1' })
+    expect(byCompany).toMatchObject({ method: 'GET', path: '/crm/companies/co-1/attachments' })
+    expect(byCompany.options.root).toBe(true)
+
+    const byDeal = await callTool('list_attachments', { dealId: 'd-1' })
+    expect(byDeal).toMatchObject({ method: 'GET', path: '/crm/deals/d-1/attachments' })
+
+    const byContact = await callTool('list_attachments', { contactId: 'c-1' })
+    expect(byContact).toMatchObject({ method: 'GET', path: '/crm/contacts/c-1/attachments' })
   })
 
   it('routes task tools to the host root, on /crm/tasks', async () => {
@@ -721,7 +738,7 @@ describe('wire format', () => {
       title: 'Testaufgabe',
       type: 'call',
       dueDate: '2026-10-01T09:00:00.000Z',
-      crmCompanyId: 'co-1',
+      dealId: 'd-1',
     })
     expect(created).toMatchObject({ method: 'POST', path: '/crm/tasks' })
     expect(created.options.root).toBe(true)
@@ -729,13 +746,17 @@ describe('wire format', () => {
       title: 'Testaufgabe',
       type: 'call',
       dueDate: '2026-10-01T09:00:00.000Z',
-      crmCompanyId: 'co-1',
+      dealId: 'd-1',
     })
 
-    const updated = await callTool('update_task', { taskId: 'task-1', title: 'Neuer Titel' })
+    const updated = await callTool('update_task', {
+      taskId: 'task-1',
+      title: 'Neuer Titel',
+      contactId: 'c-1',
+    })
     expect(updated).toMatchObject({ method: 'PATCH', path: '/crm/tasks/task-1' })
     expect(updated.options.root).toBe(true)
-    expect(updated.options.body).toMatchObject({ title: 'Neuer Titel' })
+    expect(updated.options.body).toMatchObject({ title: 'Neuer Titel', contactId: 'c-1' })
     expect(updated.options.body).not.toHaveProperty('taskId')
 
     const deleted = await callTool('delete_task', { taskId: 'task-1' })

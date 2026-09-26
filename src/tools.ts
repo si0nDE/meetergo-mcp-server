@@ -250,6 +250,42 @@ function definedOnly(args: Record<string, unknown>): Record<string, unknown> {
   )
 }
 
+type CrmScopeId = { crmCompanyId?: string; dealId?: string; contactId?: string }
+
+/**
+ * Notes and attachments always hang off exactly one parent. The API 400s zero
+ * or multiple with its own message, but that reads as a broken tool rather
+ * than a usage mistake — this throws the same complaint before the request
+ * goes out.
+ */
+function exactlyOneScopeId(
+  ids: CrmScopeId,
+): { key: keyof CrmScopeId; value: string } {
+  // Reads only the three known keys — callers may pass a larger args object
+  // (create_note also carries `content`), and that must never count as a
+  // fourth candidate.
+  const entries = (['crmCompanyId', 'dealId', 'contactId'] as const)
+    .map((key) => [key, ids[key]] as const)
+    .filter((entry): entry is [keyof CrmScopeId, string] => entry[1] !== undefined)
+  if (entries.length !== 1) {
+    throw new Error('Provide exactly one of crmCompanyId, contactId or dealId')
+  }
+  const [key, value] = entries[0]
+  return { key, value }
+}
+
+const CRM_SCOPE_PARENTS: Record<keyof CrmScopeId, string> = {
+  crmCompanyId: 'companies',
+  dealId: 'deals',
+  contactId: 'contacts',
+}
+
+/** e.g. `/crm/companies/co-1/notes`, `/crm/deals/d-1/attachments`. */
+function scopedCrmPath(ids: CrmScopeId, suffix: string): string {
+  const { key, value } = exactlyOneScopeId(ids)
+  return `/crm/${CRM_SCOPE_PARENTS[key]}/${value}/${suffix}`
+}
+
 /**
  * `webChat.publicKey` is server-minted and absent from the update DTO; the
  * API's forbidNonWhitelisted validation 400s any payload that carries it. It
@@ -1643,13 +1679,20 @@ export const TOOLS: ToolDefinition[] = [
 
   // ---- Notes ------------------------------------------------------------
   {
-    name: 'list_company_notes',
-    title: "Get a company's notes",
-    description: 'List notes logged against a CRM company, most recent first.',
-    schema: { crmCompanyId: z.string() },
+    name: 'list_notes',
+    title: 'List notes',
+    description:
+      'List notes logged against a CRM company, deal or contact, most recent first. Exactly one of crmCompanyId, dealId or contactId is required.',
+    schema: {
+      crmCompanyId: z.string().optional(),
+      dealId: z.string().optional(),
+      contactId: z.string().optional(),
+    },
     readOnly: true,
-    run: (client, { crmCompanyId }) =>
-      client.request('GET', `/crm/companies/${crmCompanyId}/notes`, { root: true }),
+    // async so the scope guard rejects rather than throwing synchronously,
+    // same as get_contact's contactId/attendeeId check.
+    run: async (client, args) =>
+      client.request('GET', scopedCrmPath(args, 'notes'), { root: true }),
   },
   {
     name: 'create_note',
@@ -1666,10 +1709,7 @@ export const TOOLS: ToolDefinition[] = [
     // async so the guard rejects rather than throwing synchronously, same as
     // get_contact's contactId/attendeeId check.
     run: async (client, args) => {
-      const targets = [args.crmCompanyId, args.contactId, args.dealId].filter(Boolean)
-      if (targets.length !== 1) {
-        throw new Error('Provide exactly one of crmCompanyId, contactId or dealId')
-      }
+      exactlyOneScopeId(args)
       return client.request('POST', '/crm/notes', { body: args, root: true })
     },
   },
@@ -1687,13 +1727,17 @@ export const TOOLS: ToolDefinition[] = [
   // ---- Attachments --------------------------------------------------------
   {
     name: 'list_attachments',
-    title: "Get a company's attachments",
+    title: 'List attachments',
     description:
-      "List attachments on a CRM company. There is no create_attachment yet: the API needs a fileAssetId from an upload step whose endpoint has not been located.",
-    schema: { crmCompanyId: z.string() },
+      "List attachments on a CRM company, deal or contact. Exactly one of crmCompanyId, dealId or contactId is required. There is no create_attachment yet: the API needs a fileAssetId from an upload step whose endpoint has not been located — and a company-scoped upload route that looked promising turned out to be a stub that reports success without saving anything.",
+    schema: {
+      crmCompanyId: z.string().optional(),
+      dealId: z.string().optional(),
+      contactId: z.string().optional(),
+    },
     readOnly: true,
-    run: (client, { crmCompanyId }) =>
-      client.request('GET', `/crm/companies/${crmCompanyId}/attachments`, { root: true }),
+    run: async (client, args) =>
+      client.request('GET', scopedCrmPath(args, 'attachments'), { root: true }),
   },
 
   // ---- Tasks --------------------------------------------------------------
@@ -1701,11 +1745,13 @@ export const TOOLS: ToolDefinition[] = [
     name: 'list_tasks',
     title: 'List tasks',
     description:
-      'List CRM tasks, paginated with page and limit. crmCompanyId scopes to one company; unconfirmed as a server-side filter, but harmless to pass on a GET.',
+      'List CRM tasks, paginated with page and limit. crmCompanyId, dealId and contactId scope to one parent; unconfirmed as server-side filters, but harmless to pass on a GET.',
     schema: {
       page: z.number().int().min(1).optional(),
       limit: z.number().int().min(1).optional(),
       crmCompanyId: z.string().optional(),
+      dealId: z.string().optional(),
+      contactId: z.string().optional(),
     },
     readOnly: true,
     run: (client, args) => client.request('GET', '/crm/tasks', { query: args, root: true }),
@@ -1722,13 +1768,15 @@ export const TOOLS: ToolDefinition[] = [
     name: 'create_task',
     title: 'Create a task',
     description:
-      'Create a CRM task. type is checked server-side, not here — confirmed values are call, follow_up, email and meeting, but the API may accept others the server never tried; an invalid value comes back as the API\'s own "type must be a valid enum value".',
+      'Create a CRM task, optionally linked to a company, deal or contact. type is checked server-side, not here — confirmed values are call, follow_up, email and meeting, but the API may accept others the server never tried; an invalid value comes back as the API\'s own "type must be a valid enum value". A bad crmCompanyId/dealId/contactId is validated too and comes back as its own 400, e.g. "Deal not found or does not belong to your company".',
     schema: {
       title: z.string(),
       type: z.string().describe('e.g. call, follow_up, email or meeting'),
       dueDate: z.string().describe('ISO 8601'),
       description: z.string().optional(),
       crmCompanyId: z.string().optional(),
+      dealId: z.string().optional(),
+      contactId: z.string().optional(),
     },
     readOnly: false,
     run: (client, body) => client.request('POST', '/crm/tasks', { body, root: true }),
@@ -1745,6 +1793,8 @@ export const TOOLS: ToolDefinition[] = [
       dueDate: z.string().optional().describe('ISO 8601'),
       description: z.string().optional(),
       crmCompanyId: z.string().optional(),
+      dealId: z.string().optional(),
+      contactId: z.string().optional(),
     },
     readOnly: false,
     run: (client, { taskId, ...body }) =>

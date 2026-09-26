@@ -313,27 +313,35 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 
 | Tool | Writes? | Purpose |
 |---|---|---|
-| `list_company_notes` | | Notes logged against a CRM company, most recent first |
-| `create_note` | **yes** | Log a note against a company, contact or deal — exactly one of the three is required |
+| `list_notes` | | Notes logged against a company, deal or contact, most recent first |
+| `create_note` | **yes** | Log a note against a company, contact or deal |
 | `delete_note` | **destructive** | Permanently delete a logged note |
+
+`list_notes` and `create_note` both require exactly one of `crmCompanyId`,
+`dealId` or `contactId` — the API rejects zero or more than one on
+`create_note`; `list_notes` checks it itself, since the id picks which nested
+path it reads.
 
 ### Attachments
 
 | Tool | Writes? | Purpose |
 |---|---|---|
-| `list_attachments` | | Attachments on a CRM company |
+| `list_attachments` | | Attachments on a company, deal or contact (same one-of-three scoping as notes) |
 
 There is no `create_attachment` yet: the API expects a `fileAssetId` from an
-upload step whose endpoint hasn't been found.
+upload step whose endpoint hasn't been found. A company-scoped upload route
+that looked promising (`POST /crm/companies/{id}/attachments`) turned out to
+be a stub — it answers `201` with a plausible-looking body but never actually
+saves anything, so it's deliberately not wired up either.
 
 ### Tasks
 
 | Tool | Writes? | Purpose |
 |---|---|---|
-| `list_tasks` | | Paginated CRM tasks |
-| `get_task` | | One task in full, including its assignee and linked company |
-| `create_task` | **yes** | Create a task; `type` and `dueDate` are required |
-| `update_task` | **yes** | Change title, type, due date, description or linked company |
+| `list_tasks` | | Paginated CRM tasks, optionally scoped to a company, deal or contact |
+| `get_task` | | One task in full, including its assignee and linked company, deal or contact |
+| `create_task` | **yes** | Create a task; `type` and `dueDate` are required, linking to a company/deal/contact is optional |
+| `update_task` | **yes** | Change title, type, due date, description or linked company/deal/contact |
 | `delete_task` | **destructive** | Permanently delete a task |
 
 Marking a task done isn't offered: `completed`, `status`, `isCompleted` and
