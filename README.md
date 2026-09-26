@@ -10,7 +10,7 @@ change anything. Both are useful and they do different jobs:
 | | Docs MCP | This server |
 |---|---|---|
 | Endpoint | `developer.meetergo.com/mcp` | `mcp.meetergo.com/mcp`, or `npx` over stdio |
-| Tools | `SearchMeetergo` | 101 scheduling, CRM, Mira and config tools |
+| Tools | `SearchMeetergo` | 107 scheduling, CRM, Mira and config tools |
 | Can it book? | No | **Yes** |
 | Use it to | write an integration | be the integration |
 
@@ -203,7 +203,7 @@ server itself is never gated — a token from any plan, including Free, works.
 
 ## Tools
 
-101 tools, covering scheduling end to end. **Scheduling** is the loop most agents
+107 tools, covering scheduling end to end. **Scheduling** is the loop most agents
 live in; the rest is there so an agent never has to fall back to raw REST.
 
 ### Scheduling
@@ -271,6 +271,16 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 | `update_contact` | **yes** | Edit a contact |
 | `bulk_create_contacts` | **yes** | Import many at once (3 calls per min) |
 | `delete_contact` | **destructive** | Remove a contact and its form answers |
+| `get_contact_timeline` | | Unified activity feed — meetings, synced emails, forms, notes, tasks, communications — merged and cursor-paginated |
+| `get_contact_emails` | | Synced email headers and previews for a contact |
+| `get_deal_emails` | | Synced email headers and previews for a deal |
+| `get_email_body` | | Full body of one synced email, fetched on demand from the provider |
+| `get_email_send_capability` | | Whether the current user's connected mailbox could send right now |
+
+There is no send endpoint: draft the email as text in the reply and let the
+human send it. `get_contact_timeline` is the compact way to answer "what's
+happened with this lead so far" instead of reading notes, tasks and emails
+separately.
 
 A contact row with `crmCompanyRef` also auto-creates a separate, unlisted
 `ContactCompany` record from its email domain if that domain hasn't been seen
@@ -317,6 +327,7 @@ view or remove them.
 | `get_company_deals` | | Deals linked to a company, across every pipeline |
 | `get_company_summary` | | Company counts and pipeline value, grouped by industry and size |
 | `get_custom_field_definitions` | | Custom field definitions on companies or deals — key, label, type, required, and the option list for a multiselect field |
+| `get_company_meeting_history` | | Meeting count, distinct people, and first/last meeting date |
 
 `get_custom_field_definitions` is a separate system from `list_data_fields`
 (booking-form fields on contacts). Look it up before writing `customFields` on
@@ -328,9 +339,13 @@ nobody sees.
 
 | Tool | Writes? | Purpose |
 |---|---|---|
-| `get_deal_communications` | | Logged communications for a deal: WhatsApp, email, call, SMS |
-| `create_communication` | **yes** | Log a communication on a deal |
+| `list_communications` | | Logged communications for a company, deal or contact: WhatsApp, email, call, SMS |
+| `create_communication` | **yes** | Log a communication against a company, deal or contact |
 | `delete_communication` | **destructive** | Permanently delete a logged communication entry |
+
+`list_communications`/`create_communication` require exactly one of
+`crmCompanyId`, `dealId` or `contactId` — the same one-of-three scoping as
+notes.
 
 ### Notes
 

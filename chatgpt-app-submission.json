@@ -464,6 +464,66 @@
         "destructive_justification": "Permanently removes the contact record."
       }
     },
+    "get_contact_timeline": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Returns a contact's unified activity timeline (meetings, emails, notes, tasks, communications).",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "get_contact_emails": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Lists synced email headers and previews for a contact.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "get_deal_emails": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Lists synced email headers and previews for a deal.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "get_email_body": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Fetches the full body of one synced email on demand.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "get_email_send_capability": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Checks whether the current user's connected mailbox could send an email.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
     "list_pipelines": {
       "annotations": {
         "readOnlyHint": true,
@@ -580,6 +640,18 @@
       },
       "justifications": {
         "read_only_justification": "Reads a deal's stage-change and update history.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "list_communications": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Lists logged communications for a company, deal or contact.",
         "open_world_justification": "Operates only on this account's own private data in meetergo.",
         "destructive_justification": "Read-only; nothing is changed or removed."
       }
@@ -1004,14 +1076,14 @@
         "destructive_justification": "Read-only; nothing is changed or removed."
       }
     },
-    "get_deal_communications": {
+    "get_company_meeting_history": {
       "annotations": {
         "readOnlyHint": true,
         "openWorldHint": false,
         "destructiveHint": false
       },
       "justifications": {
-        "read_only_justification": "Lists logged communications for a deal.",
+        "read_only_justification": "Aggregates meeting count and date range for a company.",
         "open_world_justification": "Operates only on this account's own private data in meetergo.",
         "destructive_justification": "Read-only; nothing is changed or removed."
       }

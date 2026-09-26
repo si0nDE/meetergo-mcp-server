@@ -137,6 +137,15 @@ const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001+'
 const COMMUNICATION_TYPES = ['whatsapp', 'email', 'call', 'sms'] as const
 const COMMUNICATION_DIRECTIONS = ['inbound', 'outbound'] as const
 const COMMUNICATION_OUTCOMES = ['connected', 'no_answer', 'voicemail', 'busy'] as const
+const CONTACT_ACTIVITY_TYPES = [
+  'meeting',
+  'email',
+  'form',
+  'note',
+  'task',
+  'communication',
+  'conversation',
+] as const
 
 /** Current channels. The enum also carries deprecated Skype/Teams v1 values. */
 const MEETING_CHANNELS = [
@@ -1305,6 +1314,67 @@ export const TOOLS: ToolDefinition[] = [
     run: (client, { contactId }) =>
       client.request('DELETE', `/crm/${contactId}`, { root: true }),
   },
+  {
+    name: 'get_contact_timeline',
+    title: "Get a contact's activity timeline",
+    description:
+      "Return a contact's unified activity feed — meetings, synced emails, form submissions, notes, tasks, communications and conversations — merged and ordered by occurredAt, cursor-paginated. Far more compact than reading notes, tasks and emails separately when the question is simply what happened with this lead so far.",
+    schema: {
+      contactId: z.string(),
+      types: z.array(z.enum(CONTACT_ACTIVITY_TYPES)).optional().describe('Restrict to these entry types'),
+      cursor: z.string().optional(),
+      limit: z.number().int().min(1).max(50).optional().describe('Defaults to 30'),
+    },
+    readOnly: true,
+    run: (client, { contactId, ...query }) =>
+      client.request('GET', `/crm/contacts/${contactId}/activity`, { query, root: true }),
+  },
+  {
+    name: 'get_contact_emails',
+    title: "Get a contact's synced emails",
+    description:
+      'List synced email headers and previews for a contact — subject, snippet, from/to, direction, sentAt. Fetch a full body separately; this is the index only.',
+    schema: {
+      contactId: z.string(),
+      limit: z.number().int().min(1).optional(),
+      offset: z.number().int().min(0).optional(),
+    },
+    readOnly: true,
+    run: (client, { contactId, ...query }) =>
+      client.request('GET', `/crm/contacts/${contactId}/emails`, { query, root: true }),
+  },
+  {
+    name: 'get_deal_emails',
+    title: "Get a deal's synced emails",
+    description:
+      'List synced email headers and previews for a deal — subject, snippet, from/to, direction, sentAt. Fetch a full body separately; this is the index only.',
+    schema: {
+      dealId: z.string(),
+      limit: z.number().int().min(1).optional(),
+      offset: z.number().int().min(0).optional(),
+    },
+    readOnly: true,
+    run: (client, { dealId, ...query }) =>
+      client.request('GET', `/crm/deals/${dealId}/emails`, { query, root: true }),
+  },
+  {
+    name: 'get_email_body',
+    title: 'Get a synced email body',
+    description:
+      "Fetch a synced email's full body on demand from the provider (Gmail/Outlook) — HTML, plain text, and its attachment list. The body is never stored ahead of time; the synced-email listing tools only keep the header and preview snippet.",
+    schema: { emailId: z.string() },
+    readOnly: true,
+    run: (client, { emailId }) => client.request('GET', `/crm/emails/${emailId}/body`, { root: true }),
+  },
+  {
+    name: 'get_email_send_capability',
+    title: 'Check email send capability',
+    description:
+      "Return whether the current user's connected mailbox (Google, Microsoft or IMAP) could send an email right now. There is no send endpoint yet — draft the email as text in the reply and let the human send it.",
+    schema: {},
+    readOnly: true,
+    run: (client) => client.request('GET', '/crm/emails/send-capability', { root: true }),
+  },
 
   // ---- Deals ----------------------------------------------------------------
   {
@@ -1787,37 +1857,60 @@ export const TOOLS: ToolDefinition[] = [
     run: (client, args) =>
       client.request('GET', '/crm/settings/custom-fields', { query: args, root: true }),
   },
+  {
+    name: 'get_company_meeting_history',
+    title: "Get a company's meeting history",
+    description:
+      'Aggregate meeting count, distinct people involved, and the first/last meeting date for a CRM company.',
+    schema: { crmCompanyId: z.string() },
+    readOnly: true,
+    run: (client, { crmCompanyId }) =>
+      client.request('GET', `/crm/companies/${crmCompanyId}/meeting-history`, { root: true }),
+  },
 
   // ---- Communications -------------------------------------------------------
   {
-    name: 'get_deal_communications',
-    title: "Get a deal's communications",
+    name: 'list_communications',
+    title: 'List communications',
     description:
-      'Return all logged communications for a deal (WhatsApp, email, call, SMS), ordered by occurredAt.',
-    schema: { dealId: z.string() },
+      'List logged communications (WhatsApp, email, call, SMS) for a company, deal or contact, ordered by occurredAt. Exactly one of crmCompanyId, dealId or contactId is required.',
+    schema: {
+      crmCompanyId: z.string().optional(),
+      dealId: z.string().optional(),
+      contactId: z.string().optional(),
+    },
     readOnly: true,
-    run: (client, { dealId }) =>
-      client.request('GET', `/crm/deals/${dealId}/communications`, { root: true }),
+    run: async (client, args) => {
+      const { key, value } = exactlyOneScopeId(args)
+      if (key === 'dealId') {
+        return client.request('GET', `/crm/deals/${value}/communications`, { root: true })
+      }
+      return client.request('GET', '/crm/communications', { query: { [key]: value }, root: true })
+    },
   },
   {
     name: 'create_communication',
     title: 'Log a communication',
     description:
-      'Log a communication on a deal: a WhatsApp message, email, call or SMS.',
+      'Log a communication on a company, deal or contact: a WhatsApp message, email, call or SMS. Exactly one of crmCompanyId, dealId or contactId is required — the API rejects zero or more than one.',
     schema: {
-      dealId: z.string(),
       type: z.enum(COMMUNICATION_TYPES),
       direction: z.enum(COMMUNICATION_DIRECTIONS),
       body: z.string(),
       occurredAt: z.string().describe('ISO 8601'),
+      dealId: z.string().optional(),
       contactId: z.string().optional(),
       crmCompanyId: z.string().optional(),
       subject: z.string().optional(),
       outcome: z.enum(COMMUNICATION_OUTCOMES).optional().describe('Only meaningful for calls'),
     },
     readOnly: false,
-    run: (client, body) =>
-      client.request('POST', '/crm/communications', { body, root: true }),
+    // async so the guard rejects rather than throwing synchronously, same as
+    // create_note's scope check.
+    run: async (client, body) => {
+      exactlyOneScopeId(body)
+      return client.request('POST', '/crm/communications', { body, root: true })
+    },
   },
   {
     name: 'delete_communication',

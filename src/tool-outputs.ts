@@ -244,7 +244,44 @@ const communication = out(
     createdAt: str,
     updatedAt: str,
   },
-  'A logged communication (WhatsApp, email, call or SMS) on a deal',
+  'A logged communication (WhatsApp, email, call or SMS) on a company, deal or contact',
+)
+
+const contactActivityItem = out(
+  {
+    id: str,
+    type: str.describe('meeting, email, form, note, task, communication or conversation'),
+    source: str,
+    occurredAt: str,
+    title: str,
+    summary: str,
+    direction: str,
+    status: str,
+    owner: record.nullable().optional(),
+    deal: record.nullable().optional(),
+    recordingSessionId: str.describe("This entry's meeting recording, when there is one"),
+  },
+  "One entry in a contact's unified activity timeline",
+)
+
+const crmEmail = out(
+  {
+    id: str.describe('The emailId get_email_body takes'),
+    externalMessageId: str,
+    threadId: str,
+    subject: str,
+    snippet: str,
+    fromEmail: str,
+    toEmails: list(z.string()),
+    direction: str,
+    sentAt: str,
+    provider: str,
+    contactId: str,
+    dealId: str,
+    providerUrl: str.describe('Deep link to open in Gmail or Outlook'),
+    createdAt: str,
+  },
+  'A synced email — header and preview only, no body',
 )
 
 const note = out(
@@ -648,6 +685,29 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
     'Result counts from the bulk contact import',
   ),
   delete_contact: ok,
+  get_contact_timeline: out(
+    { items: list(contactActivityItem), nextCursor: str, hasMore: bool },
+    "A contact's unified activity timeline, cursor-paginated",
+  ),
+  get_contact_emails: out(
+    { data: list(crmEmail), total: num },
+    "A contact's synced emails, most recent first",
+  ),
+  get_deal_emails: out(
+    { data: list(crmEmail), total: num },
+    "A deal's synced emails, most recent first",
+  ),
+  get_email_body: out(
+    { html: str, text: str, attachments: list(record) },
+    'The full body of one synced email, fetched on demand',
+  ),
+  get_email_send_capability: out(
+    {
+      canSend: bool,
+      provider: str.describe('google, microsoft or imap'),
+    },
+    "Whether the current user's connected mailbox could send right now",
+  ),
   list_pipelines: listOf(pipeline, 'Sales pipelines and their stages'),
   list_deals: out(
     {
@@ -739,7 +799,16 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
     { fields: list(customFieldDefinition) },
     'Custom field definitions for the record type',
   ),
-  get_deal_communications: listOf(communication, "A deal's logged communications"),
+  get_company_meeting_history: out(
+    {
+      meetings: num,
+      people: num,
+      firstMeetingAt: str,
+      lastMeetingAt: str,
+    },
+    'Meeting count and date range for a company',
+  ),
+  list_communications: listOf(communication, "Logged communications for the company, deal or contact"),
   create_communication: communication,
   delete_communication: ok,
   list_notes: listOf(note, 'Logged notes for the company, deal or contact'),

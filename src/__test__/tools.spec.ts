@@ -8,7 +8,7 @@ import { TOOLS, sanitizeMiraSettingsForPatch } from '../tools.js'
  */
 describe('meetergo MCP tool surface', () => {
   it('covers the API surface an agent needs, with no duplicate names', () => {
-    expect(TOOLS).toHaveLength(101)
+    expect(TOOLS).toHaveLength(107)
     expect(new Set(TOOLS.map((t) => t.name)).size).toBe(TOOLS.length)
   })
 
@@ -689,10 +689,18 @@ describe('wire format', () => {
     expect(deals.path).toBe('/crm/companies/co-1/deals')
   })
 
-  it('routes communication tools to the host root, on the deal-scoped path', async () => {
-    const list = await callTool('get_deal_communications', { dealId: 'd-1' })
-    expect(list).toMatchObject({ method: 'GET', path: '/crm/deals/d-1/communications' })
-    expect(list.options.root).toBe(true)
+  it('routes communication tools to the host root, scoped by company, deal or contact', async () => {
+    const byDeal = await callTool('list_communications', { dealId: 'd-1' })
+    expect(byDeal).toMatchObject({ method: 'GET', path: '/crm/deals/d-1/communications' })
+    expect(byDeal.options.root).toBe(true)
+
+    const byCompany = await callTool('list_communications', { crmCompanyId: 'co-1' })
+    expect(byCompany).toMatchObject({ method: 'GET', path: '/crm/communications' })
+    expect(byCompany.options.query).toMatchObject({ crmCompanyId: 'co-1' })
+
+    const byContact = await callTool('list_communications', { contactId: 'c-1' })
+    expect(byContact).toMatchObject({ method: 'GET', path: '/crm/communications' })
+    expect(byContact.options.query).toMatchObject({ contactId: 'c-1' })
 
     const created = await callTool('create_communication', {
       dealId: 'd-1',
@@ -714,6 +722,23 @@ describe('wire format', () => {
     const deleted = await callTool('delete_communication', { communicationId: 'comm-1' })
     expect(deleted).toMatchObject({ method: 'DELETE', path: '/crm/communications/comm-1' })
     expect(deleted.options.root).toBe(true)
+  })
+
+  it('rejects list_communications/create_communication unless exactly one scope id is given', async () => {
+    const { client } = record()
+    const base = { type: 'call', direction: 'outbound', body: 'x', occurredAt: '2026-09-07T11:00:00.000Z' }
+    for (const [name, extra] of [
+      ['list_communications', {}],
+      ['create_communication', base],
+    ] as const) {
+      const tool = TOOLS.find((t) => t.name === name)!
+      await expect(tool.run(client, extra)).rejects.toThrow(
+        /exactly one of crmCompanyId, contactId or dealId/i,
+      )
+      await expect(
+        tool.run(client, { ...extra, crmCompanyId: 'co-1', dealId: 'd-1' }),
+      ).rejects.toThrow(/exactly one of crmCompanyId, contactId or dealId/i)
+    }
   })
 
   it('routes note tools to the host root, on the scoped path', async () => {
@@ -850,6 +875,34 @@ describe('wire format', () => {
     const byCompany = await callTool('list_company_tasks', { crmCompanyId: 'co-1' })
     expect(byCompany).toMatchObject({ method: 'GET', path: '/crm/tasks/by-company/co-1' })
     expect(byCompany.options.root).toBe(true)
+  })
+
+  it("reads a contact's activity timeline, emails and a company's meeting history", async () => {
+    const timeline = await callTool('get_contact_timeline', { contactId: 'c-1', limit: 10 })
+    expect(timeline).toMatchObject({ method: 'GET', path: '/crm/contacts/c-1/activity' })
+    expect(timeline.options.root).toBe(true)
+    expect(timeline.options.query).toMatchObject({ limit: 10 })
+    expect(timeline.options.query).not.toHaveProperty('contactId')
+
+    const contactEmails = await callTool('get_contact_emails', { contactId: 'c-1' })
+    expect(contactEmails).toMatchObject({ method: 'GET', path: '/crm/contacts/c-1/emails' })
+    expect(contactEmails.options.root).toBe(true)
+
+    const dealEmails = await callTool('get_deal_emails', { dealId: 'd-1' })
+    expect(dealEmails).toMatchObject({ method: 'GET', path: '/crm/deals/d-1/emails' })
+    expect(dealEmails.options.root).toBe(true)
+
+    const body = await callTool('get_email_body', { emailId: 'e-1' })
+    expect(body).toMatchObject({ method: 'GET', path: '/crm/emails/e-1/body' })
+    expect(body.options.root).toBe(true)
+
+    const capability = await callTool('get_email_send_capability')
+    expect(capability).toMatchObject({ method: 'GET', path: '/crm/emails/send-capability' })
+    expect(capability.options.root).toBe(true)
+
+    const history = await callTool('get_company_meeting_history', { crmCompanyId: 'co-1' })
+    expect(history).toMatchObject({ method: 'GET', path: '/crm/companies/co-1/meeting-history' })
+    expect(history.options.root).toBe(true)
   })
 
   it('filters search_contacts to an exact, case-insensitive email match', async () => {
