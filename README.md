@@ -10,7 +10,7 @@ change anything. Both are useful and they do different jobs:
 | | Docs MCP | This server |
 |---|---|---|
 | Endpoint | `developer.meetergo.com/mcp` | `mcp.meetergo.com/mcp`, or `npx` over stdio |
-| Tools | `SearchMeetergo` | 112 scheduling, CRM, Mira and config tools |
+| Tools | `SearchMeetergo` | 129 scheduling, CRM, Mira and config tools |
 | Can it book? | No | **Yes** |
 | Use it to | write an integration | be the integration |
 
@@ -203,7 +203,7 @@ server itself is never gated — a token from any plan, including Free, works.
 
 ## Tools
 
-112 tools, covering scheduling end to end. **Scheduling** is the loop most agents
+129 tools, covering scheduling end to end. **Scheduling** is the loop most agents
 live in; the rest is there so an agent never has to fall back to raw REST.
 
 ### Scheduling
@@ -260,6 +260,10 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 | `list_form_recipients` | | Who got it, who answered |
 | `list_data_fields` | | Reusable fields across forms |
 | `create_data_field` | **yes** | Add one |
+| `update_data_field` | **yes** | Change a field's label, type, key, required flag, options or target mapping |
+| `delete_data_field` | **destructive** | Remove a field |
+| `get_data_field_usage` | | Where a field is actually used — check before editing or deleting it |
+| `reorder_data_fields` | **yes** | Set field display order — the full `fieldIds` list, not a partial move |
 
 ### CRM
 
@@ -318,6 +322,7 @@ view or remove them.
 | `remove_deal_contact` | **destructive** | Unlink a contact from a deal |
 | `merge_deals` | **destructive** | Merge duplicates into a survivor; the merged-in deals are permanently deleted |
 | `bulk_import_deals` | **yes** | Upsert contacts and create one deal per row, into one pipeline stage (max 500 rows) |
+| `get_deal_appointments` | | Appointments booked or held directly on a deal |
 
 `bulk_import_deals` has the same `crmCompanyRef` orphan-record caveat as
 `bulk_create_contacts` above. Look up and confirm duplicates with
@@ -329,6 +334,24 @@ cover the same afterwards, e.g. when a second decision-maker joins mid-deal.
 `get_deal` always embeds the current contacts array, so a `dealContactId` for
 `update_deal_contact`/`remove_deal_contact` comes from reading that first —
 it is the link's own id, not the contact's.
+
+### Pipelines
+
+| Tool | Writes? | Purpose |
+|---|---|---|
+| `create_pipeline` | **yes** | Add a pipeline, optionally with its stages in one call |
+| `update_pipeline` | **yes** | Rename a pipeline or change its default flag |
+| `delete_pipeline` | **destructive** | Remove a pipeline and its stages |
+| `add_pipeline_stage` | **yes** | Add a stage; `name` and `color` required |
+| `update_pipeline_stage` | **yes** | Change a stage's settings, including `salesMilestone` |
+| `delete_pipeline_stage` | **destructive** | Remove a stage; `moveToStageId` is required so its deals aren't stranded |
+| `reorder_pipeline_stages` | **yes** | Set a pipeline's stage order — the full `stageIds` list, not a partial move |
+
+`salesMilestone` (`start`/`demo`/`offer`, on a stage) is what the "Sales
+Learning" reports (average sales-cycle length, demo-to-quote conversion) key
+off — the first time a deal enters a stage marked `start`/`demo`/`offer`
+becomes its opportunity-start/first-demo/first-quote date. Those reports
+show no data until at least one stage in the pipeline carries a milestone.
 
 ### Companies
 
@@ -344,6 +367,9 @@ it is the link's own id, not the contact's.
 | `get_company_deals` | | Deals linked to a company, across every pipeline |
 | `get_company_summary` | | Company counts and pipeline value, grouped by industry and size |
 | `get_custom_field_definitions` | | Custom field definitions on companies or deals — key, label, type, required, and the option list for a multiselect field |
+| `update_custom_field_definitions` | **destructive** | Replace the entire set of custom field definitions for companies or deals |
+| `get_lost_reasons` | | Selectable reasons for marking a deal lost, and whether picking one is required |
+| `update_lost_reasons` | **destructive** | Replace the entire set of selectable lost-deal reasons |
 | `get_company_meeting_history` | | Meeting count, distinct people, and first/last meeting date |
 
 `get_custom_field_definitions` is a separate system from `list_data_fields`
@@ -352,12 +378,20 @@ it is the link's own id, not the contact's.
 wrong-cased key is not rejected — it is silently stored as an extra key
 nobody sees.
 
+`update_custom_field_definitions` and `update_lost_reasons` are both full
+replaces of a company-wide settings list, not a patch: read the current set
+first and send it back with your change folded in, or anything left out is
+gone. Without `get_lost_reasons`/`update_lost_reasons`, marking a deal lost
+only ever takes a free-text reason, which is how uncategorized reasons pile
+up in loss-reason reporting.
+
 ### Communications
 
 | Tool | Writes? | Purpose |
 |---|---|---|
 | `list_communications` | | Logged communications for a company, deal or contact: WhatsApp, email, call, SMS |
 | `create_communication` | **yes** | Log a communication against a company, deal or contact |
+| `update_communication` | **yes** | Correct a logged communication's type, direction, subject, body, duration, outcome or timestamp |
 | `delete_communication` | **destructive** | Permanently delete a logged communication entry |
 
 `list_communications`/`create_communication` require exactly one of
@@ -374,6 +408,7 @@ deals or contacts.
 |---|---|---|
 | `list_notes` | | Notes logged against a company, deal or contact, most recent first |
 | `create_note` | **yes** | Log a note against a company, contact or deal |
+| `update_note` | **yes** | Change a note's content, or pin it to the top of its list |
 | `delete_note` | **destructive** | Permanently delete a logged note |
 
 `list_notes` and `create_note` both require exactly one of `crmCompanyId`,

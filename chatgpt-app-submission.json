@@ -428,6 +428,54 @@
         "destructive_justification": "Does not delete data, revoke access, or perform irreversible actions."
       }
     },
+    "update_data_field": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Changes a reusable booking-form field.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Only the fields supplied change; nothing is deleted."
+      }
+    },
+    "delete_data_field": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Permanently deletes a reusable booking-form field.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Permanently removes the field."
+      }
+    },
+    "get_data_field_usage": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Shows where a reusable form field is actually used.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "reorder_data_fields": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Sets the display order of reusable form fields.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Only reorders; nothing is deleted."
+      }
+    },
     "bulk_create_contacts": {
       "annotations": {
         "readOnlyHint": false,
@@ -546,6 +594,90 @@
         "read_only_justification": "Reads sales pipelines and their stages.",
         "open_world_justification": "Operates only on this account's own private data in meetergo.",
         "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "create_pipeline": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Creates a sales pipeline, optionally with its stages.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Adds a record; nothing existing is changed or removed."
+      }
+    },
+    "update_pipeline": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Renames a pipeline or changes its default flag.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Only the fields supplied change; nothing is deleted."
+      }
+    },
+    "delete_pipeline": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Permanently deletes a pipeline and its stages.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Permanently removes the pipeline and its stages."
+      }
+    },
+    "add_pipeline_stage": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Adds a stage to an existing pipeline.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Adds a record; nothing existing is changed or removed."
+      }
+    },
+    "update_pipeline_stage": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Changes a pipeline stage's settings.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Only the fields supplied change; nothing is deleted."
+      }
+    },
+    "delete_pipeline_stage": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Permanently deletes a pipeline stage, moving its deals first.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Permanently removes the stage after moving its deals elsewhere."
+      }
+    },
+    "reorder_pipeline_stages": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Sets the display order of a pipeline's stages.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Only reorders; nothing is deleted."
       }
     },
     "list_deals": {
@@ -688,6 +820,18 @@
       },
       "justifications": {
         "read_only_justification": "Reads a deal's stage-change and update history.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "get_deal_appointments": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Lists appointments booked or held directly on a deal.",
         "open_world_justification": "Operates only on this account's own private data in meetergo.",
         "destructive_justification": "Read-only; nothing is changed or removed."
       }
@@ -1136,6 +1280,42 @@
         "destructive_justification": "Read-only; nothing is changed or removed."
       }
     },
+    "update_custom_field_definitions": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Replaces the entire set of custom field definitions for companies or deals.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Fully replaces the configured fields; fields left out are gone."
+      }
+    },
+    "get_lost_reasons": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Lists the configured, selectable reasons for marking a deal lost.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
+    },
+    "update_lost_reasons": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Replaces the entire set of selectable lost-deal reasons.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Fully replaces the configured list; reasons left out are gone."
+      }
+    },
     "get_company_meeting_history": {
       "annotations": {
         "readOnlyHint": true,
@@ -1158,6 +1338,18 @@
         "read_only_justification": "Creates a new communication log entry on a deal.",
         "open_world_justification": "Operates only on this account's own private data in meetergo.",
         "destructive_justification": "Adds a record; nothing existing is changed or removed."
+      }
+    },
+    "update_communication": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Corrects a logged communication.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Only the fields supplied change; nothing is deleted."
       }
     },
     "delete_communication": {
@@ -1194,6 +1386,18 @@
         "read_only_justification": "Creates a new note against a company, contact or deal.",
         "open_world_justification": "Operates only on this account's own private data in meetergo.",
         "destructive_justification": "Adds a record; nothing existing is changed or removed."
+      }
+    },
+    "update_note": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Changes a logged note's content or pinned flag.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Only the fields supplied change; nothing is deleted."
       }
     },
     "delete_note": {

@@ -125,6 +125,26 @@ const DEAL_CONTACT_ROLES = [
   'other',
 ] as const
 
+/** What entering a pipeline stage records for the Sales Learning report. */
+const SALES_MILESTONES = ['start', 'demo', 'offer'] as const
+
+const pipelineStageShape = {
+  name: z.string().max(100),
+  color: z.string().max(20),
+  isWon: z.boolean().optional(),
+  isLost: z.boolean().optional(),
+  winProbability: z.number().min(0).max(100).optional(),
+  rottingDays: z.number().optional(),
+  requiredCustomFields: z.array(z.string()).optional(),
+  salesMilestone: z
+    .enum(SALES_MILESTONES)
+    .nullable()
+    .optional()
+    .describe(
+      'What entering this stage records for the Sales Learning report (start/demo/offer date). null clears it.',
+    ),
+}
+
 /**
  * The nested objects list_deals embeds per deal. Each one roughly doubles the
  * response size on a workspace with real contact/company records, so they are
@@ -1351,6 +1371,49 @@ export const TOOLS: ToolDefinition[] = [
     readOnly: false,
     run: (client, body) => client.request('POST', '/data-field', { body }),
   },
+  {
+    name: 'update_data_field',
+    title: 'Update a data field',
+    description:
+      "Change a reusable form field: label, type, internal key, required flag, choice options or target mapping. Only supplied fields change. Check where the field is actually used first — a live type change on a field already answered on real forms can strand those old answers.",
+    schema: {
+      fieldId: z.number().describe('Numeric id, from list_data_fields'),
+      label: z.string().optional(),
+      fieldType: z.enum(DATA_FIELD_TYPES).optional(),
+      name: z.string().optional(),
+      required: z.boolean().optional(),
+      options: z.array(z.record(z.unknown())).optional().describe('For choice fields: [{ label, value }]'),
+      target: z.string().optional(),
+    },
+    readOnly: false,
+    run: (client, { fieldId, ...body }) => client.request('PATCH', `/data-field/${fieldId}`, { body }),
+  },
+  {
+    name: 'delete_data_field',
+    title: 'Delete a data field',
+    description:
+      'Permanently delete a reusable form field. Check where it is actually used first — a field still referenced by live forms may leave those forms with a dangling reference.',
+    schema: { fieldId: z.number().describe('Numeric id, from list_data_fields') },
+    readOnly: false,
+    destructive: true,
+    run: (client, { fieldId }) => client.request('DELETE', `/data-field/${fieldId}`, {}),
+  },
+  {
+    name: 'get_data_field_usage',
+    title: 'Get a data field usage',
+    description: 'Show where a reusable form field is actually used, before editing or deleting it.',
+    schema: { fieldId: z.number().describe('Numeric id, from list_data_fields') },
+    readOnly: true,
+    run: (client, { fieldId }) => client.request('GET', `/data-field/${fieldId}/usage`, {}),
+  },
+  {
+    name: 'reorder_data_fields',
+    title: 'Reorder data fields',
+    description: 'Set the display order of reusable form fields. Pass every fieldId, in the new order — this replaces the order wholesale, not a partial move.',
+    schema: { fieldIds: z.array(z.number()).min(1) },
+    readOnly: false,
+    run: (client, { fieldIds }) => client.request('PATCH', '/data-field/reorder', { body: { fieldIds } }),
+  },
 
   // ---- CRM ----------------------------------------------------------------
   {
@@ -1499,6 +1562,104 @@ export const TOOLS: ToolDefinition[] = [
     schema: {},
     readOnly: true,
     run: (client) => client.request('GET', '/crm/pipelines', { root: true }),
+  },
+  {
+    name: 'create_pipeline',
+    title: 'Create a pipeline',
+    description:
+      "Create a sales pipeline, optionally with its stages in one call. name is optional — the API fills in the standard name in the caller's language when omitted.",
+    schema: {
+      name: z.string().max(100).optional(),
+      isDefault: z.boolean().optional(),
+      stages: z.array(z.object(pipelineStageShape)).optional(),
+    },
+    readOnly: false,
+    run: (client, body) => client.request('POST', '/crm/pipelines', { body, root: true }),
+  },
+  {
+    name: 'update_pipeline',
+    title: 'Update a pipeline',
+    description: 'Rename a pipeline or change which one is the default. Only supplied fields change.',
+    schema: {
+      pipelineId: z.string(),
+      name: z.string().max(100).optional(),
+      isDefault: z.boolean().optional(),
+    },
+    readOnly: false,
+    run: (client, { pipelineId, ...body }) =>
+      client.request('PATCH', `/crm/pipelines/${pipelineId}`, { body, root: true }),
+  },
+  {
+    name: 'delete_pipeline',
+    title: 'Delete a pipeline',
+    description: 'Permanently delete a pipeline and its stages. Deals in it are not moved first — check for any before deleting.',
+    schema: { pipelineId: z.string() },
+    readOnly: false,
+    destructive: true,
+    run: (client, { pipelineId }) =>
+      client.request('DELETE', `/crm/pipelines/${pipelineId}`, { root: true }),
+  },
+  {
+    name: 'add_pipeline_stage',
+    title: 'Add a pipeline stage',
+    description:
+      'Add a stage to an existing pipeline. name and color are required; salesMilestone (start/demo/offer) marks the stage for the Sales Learning report — set it on the stages that represent those milestones (e.g. an "Angebot" stage as offer) or those reports stay empty.',
+    schema: {
+      pipelineId: z.string(),
+      ...pipelineStageShape,
+    },
+    readOnly: false,
+    run: (client, { pipelineId, ...body }) =>
+      client.request('POST', `/crm/pipelines/${pipelineId}/stages`, { body, root: true }),
+  },
+  {
+    name: 'update_pipeline_stage',
+    title: 'Update a pipeline stage',
+    description:
+      'Change a stage: name, color, won/lost flags, win probability, rotting threshold, required custom fields, or its salesMilestone (start/demo/offer, or null to clear it). Only supplied fields change.',
+    schema: {
+      pipelineId: z.string(),
+      stageId: z.string(),
+      ...pipelineStageShape,
+      name: pipelineStageShape.name.optional(),
+      color: pipelineStageShape.color.optional(),
+    },
+    readOnly: false,
+    run: (client, { pipelineId, stageId, ...body }) =>
+      client.request('PATCH', `/crm/pipelines/${pipelineId}/stages/${stageId}`, { body, root: true }),
+  },
+  {
+    name: 'delete_pipeline_stage',
+    title: 'Delete a pipeline stage',
+    description:
+      'Permanently delete a stage. moveToStageId is required: every deal currently in this stage moves there first, so no deal is left in limbo.',
+    schema: {
+      pipelineId: z.string(),
+      stageId: z.string(),
+      moveToStageId: z.string(),
+    },
+    readOnly: false,
+    destructive: true,
+    run: (client, { pipelineId, stageId, moveToStageId }) =>
+      client.request('DELETE', `/crm/pipelines/${pipelineId}/stages/${stageId}`, {
+        query: { moveToStageId },
+        root: true,
+      }),
+  },
+  {
+    name: 'reorder_pipeline_stages',
+    title: 'Reorder pipeline stages',
+    description: "Set the display order of a pipeline's stages. Pass every stageId in the pipeline, in the new order — this replaces the order wholesale, not a partial move.",
+    schema: {
+      pipelineId: z.string(),
+      stageIds: z.array(z.string()).min(1),
+    },
+    readOnly: false,
+    run: (client, { pipelineId, stageIds }) =>
+      client.request('PATCH', `/crm/pipelines/${pipelineId}/stages/reorder`, {
+        body: { stageIds },
+        root: true,
+      }),
   },
   {
     name: 'list_deals',
@@ -1746,6 +1907,15 @@ export const TOOLS: ToolDefinition[] = [
         query: { limit: limit ?? 50 },
         root: true,
       }),
+  },
+  {
+    name: 'get_deal_appointments',
+    title: "Get a deal's appointments",
+    description: 'List appointments booked or held directly on a deal.',
+    schema: { dealId: z.string() },
+    readOnly: true,
+    run: (client, { dealId }) =>
+      client.request('GET', `/crm/deals/${dealId}/appointments`, { root: true }),
   },
   {
     name: 'get_deal_summary',
@@ -2016,6 +2186,62 @@ export const TOOLS: ToolDefinition[] = [
       client.request('GET', '/crm/settings/custom-fields', { query: args, root: true }),
   },
   {
+    name: 'update_custom_field_definitions',
+    title: 'Update custom field definitions',
+    description:
+      "Replace the entire set of custom field definitions for CRM companies or deals — this is a full replace of the fields array, not a patch: fields left out of the call are gone, not left alone. Read the current set first and send it back with your change folded in. Existing values already stored under a removed field's key are not itself deleted by this, they just lose their definition (type, label, options).",
+    schema: {
+      recordType: z.enum(['company', 'deal']).optional().describe('Defaults to deal'),
+      fields: z.array(
+        z.object({
+          id: z.string().describe('Keep the existing id to edit a field; a new one to add it'),
+          key: z.string().describe('The exact-case key values are stored under'),
+          label: z.string(),
+          type: z.enum(['text', 'textarea', 'number', 'currency', 'date', 'select', 'multiselect', 'checkbox']),
+          required: z.boolean(),
+          options: z.array(z.string()).optional().describe('For select/multiselect'),
+          order: z.number(),
+        }),
+      ),
+    },
+    readOnly: false,
+    destructive: true,
+    run: (client, { recordType, fields }) =>
+      client.request('PUT', '/crm/settings/custom-fields', {
+        query: { recordType },
+        body: { fields },
+        root: true,
+      }),
+  },
+  {
+    name: 'get_lost_reasons',
+    title: 'Get lost-deal reasons',
+    description:
+      'Return the configured, selectable reasons for marking a deal lost, and whether picking one is required. Closing a deal as lost otherwise takes a free-text reason, which is how "Sonstiges" (uncategorized) piles up in loss-reason reporting.',
+    schema: {},
+    readOnly: true,
+    run: (client) => client.request('GET', '/crm/settings/lost-reasons', { root: true }),
+  },
+  {
+    name: 'update_lost_reasons',
+    title: 'Update lost-deal reasons',
+    description:
+      'Replace the entire set of selectable lost-deal reasons — this is a full replace, not a patch: reasons left out of the call are gone, not left alone. Read the current set first. key is what a deal stores and stays stable across relabels; archived hides a reason from new closes without breaking deals already closed under it.',
+    schema: {
+      reasons: z.array(
+        z.object({
+          key: z.string().max(64).describe('Stable identifier stored on the deal'),
+          label: z.string().max(60).optional().describe('Omit on a built-in reason to keep its translation'),
+          archived: z.boolean().optional(),
+        }),
+      ),
+      required: z.boolean().describe('Whether picking a reason is mandatory to mark a deal lost'),
+    },
+    readOnly: false,
+    destructive: true,
+    run: (client, body) => client.request('PUT', '/crm/settings/lost-reasons', { body, root: true }),
+  },
+  {
     name: 'get_company_meeting_history',
     title: "Get a company's meeting history",
     description:
@@ -2071,6 +2297,24 @@ export const TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'update_communication',
+    title: 'Update a communication',
+    description: 'Correct a logged communication — type, direction, subject, body, duration, outcome or when it occurred. Only supplied fields change.',
+    schema: {
+      communicationId: z.string(),
+      type: z.enum(COMMUNICATION_TYPES).optional(),
+      direction: z.enum(COMMUNICATION_DIRECTIONS).optional(),
+      subject: z.string().optional(),
+      body: z.string().optional(),
+      durationSeconds: z.number().min(0).optional(),
+      outcome: z.enum(COMMUNICATION_OUTCOMES).optional().describe('Only meaningful for calls'),
+      occurredAt: z.string().optional().describe('ISO 8601'),
+    },
+    readOnly: false,
+    run: (client, { communicationId, ...body }) =>
+      client.request('PATCH', `/crm/communications/${communicationId}`, { body, root: true }),
+  },
+  {
     name: 'delete_communication',
     title: 'Delete a communication',
     description: 'Permanently delete a logged communication entry.',
@@ -2116,6 +2360,20 @@ export const TOOLS: ToolDefinition[] = [
       exactlyOneScopeId(args)
       return client.request('POST', '/crm/notes', { body: args, root: true })
     },
+  },
+  {
+    name: 'update_note',
+    title: 'Update a note',
+    description:
+      "Change a logged note's content, or pin it to the top of the company/deal/contact's note list. Only supplied fields change.",
+    schema: {
+      noteId: z.string(),
+      content: z.string().optional(),
+      isPinned: z.boolean().optional(),
+    },
+    readOnly: false,
+    run: (client, { noteId, ...body }) =>
+      client.request('PATCH', `/crm/notes/${noteId}`, { body, root: true }),
   },
   {
     name: 'delete_note',

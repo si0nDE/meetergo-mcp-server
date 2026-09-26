@@ -160,6 +160,7 @@ const pipelineStage = out(
     rottingDays: num,
     requiredCustomFields: list(z.string()),
     pipelineId: str,
+    salesMilestone: str.describe('start, demo or offer, when set — feeds the Sales Learning report'),
   },
   'A stage within a pipeline',
 )
@@ -733,6 +734,10 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
   ),
   list_data_fields: listOf(dataField, 'Reusable form fields'),
   create_data_field: dataField,
+  update_data_field: dataField,
+  delete_data_field: ok,
+  get_data_field_usage: record.describe('Where this field is actually used; shape unconfirmed'),
+  reorder_data_fields: listOf(dataField, 'The fields in their new order'),
   bulk_create_contacts: out(
     {
       created: num.describe('Newly inserted contacts'),
@@ -772,6 +777,13 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
     "Whether the current user's connected mailbox could send right now",
   ),
   list_pipelines: listOf(pipeline, 'Sales pipelines and their stages'),
+  create_pipeline: pipeline,
+  update_pipeline: pipeline,
+  delete_pipeline: ok,
+  add_pipeline_stage: pipelineStage,
+  update_pipeline_stage: pipelineStage,
+  delete_pipeline_stage: ok,
+  reorder_pipeline_stages: listOf(pipelineStage, 'The stages in their new order'),
   list_deals: out(
     {
       deals: list(deal),
@@ -793,6 +805,7 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
   mark_deal_lost: deal,
   reopen_deal: deal,
   get_deal_activity: listOf(dealActivity, "A deal's activity log, most recent first"),
+  get_deal_appointments: listOf(record, "A deal's appointments; shape unconfirmed"),
   get_deal_summary: out(
     {
       totalDeals: num,
@@ -865,6 +878,18 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
     { fields: list(customFieldDefinition) },
     'Custom field definitions for the record type',
   ),
+  update_custom_field_definitions: out(
+    { fields: list(customFieldDefinition) },
+    'Custom field definitions after the replace',
+  ),
+  get_lost_reasons: out(
+    { reasons: list(record), required: bool },
+    'Selectable lost-deal reasons and whether picking one is required',
+  ),
+  update_lost_reasons: out(
+    { reasons: list(record), required: bool },
+    'Selectable lost-deal reasons after the replace',
+  ),
   get_company_meeting_history: out(
     {
       meetings: num,
@@ -876,9 +901,11 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
   ),
   list_communications: listOf(communication, "Logged communications for the company, deal or contact"),
   create_communication: communication,
+  update_communication: communication,
   delete_communication: ok,
   list_notes: listOf(note, 'Logged notes for the company, deal or contact'),
   create_note: note,
+  update_note: note,
   delete_note: ok,
   list_attachments: listOf(attachment, 'Attachments on the company, deal or contact'),
   list_tasks: out(

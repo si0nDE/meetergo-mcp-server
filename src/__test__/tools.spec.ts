@@ -8,7 +8,7 @@ import { TOOLS, sanitizeMiraSettingsForPatch } from '../tools.js'
  */
 describe('meetergo MCP tool surface', () => {
   it('covers the API surface an agent needs, with no duplicate names', () => {
-    expect(TOOLS).toHaveLength(112)
+    expect(TOOLS).toHaveLength(129)
     expect(new Set(TOOLS.map((t) => t.name)).size).toBe(TOOLS.length)
   })
 
@@ -52,6 +52,7 @@ describe('meetergo MCP tool surface', () => {
     expect(writes).toEqual([
       'add_deal_contact',
       'add_guest',
+      'add_pipeline_stage',
       'answer_visitor_question',
       'book_appointment',
       'bulk_create_contacts',
@@ -68,6 +69,7 @@ describe('meetergo MCP tool surface', () => {
       'create_meeting_type',
       'create_note',
       'create_one_time_booking_link',
+      'create_pipeline',
       'create_qualification_form',
       'create_routing_form',
       'create_task',
@@ -75,10 +77,13 @@ describe('meetergo MCP tool surface', () => {
       'delete_communication',
       'delete_company',
       'delete_contact',
+      'delete_data_field',
       'delete_deal',
       'delete_knowledge_document',
       'delete_meeting_type',
       'delete_note',
+      'delete_pipeline',
+      'delete_pipeline_stage',
       'delete_routing_form',
       'delete_task',
       'delete_webhook',
@@ -88,6 +93,8 @@ describe('meetergo MCP tool surface', () => {
       'merge_deals',
       'remove_deal_contact',
       'reopen_deal',
+      'reorder_data_fields',
+      'reorder_pipeline_stages',
       'reschedule_appointment',
       'restore_mira_settings',
       // Not a data mutation an operator would name, but it persists the
@@ -98,14 +105,21 @@ describe('meetergo MCP tool surface', () => {
       'send_routing_form',
       'uncomplete_task',
       'update_appointment_notes',
+      'update_communication',
       'update_company',
       'update_contact',
+      'update_custom_field_definitions',
+      'update_data_field',
       'update_deal',
       'update_deal_contact',
+      'update_lost_reasons',
       'update_meeting_transcription',
       'update_meeting_type',
       'update_mira_settings',
+      'update_note',
       'update_personal_page',
+      'update_pipeline',
+      'update_pipeline_stage',
       'update_routing_form',
       'update_task',
       'update_webhook',
@@ -127,10 +141,13 @@ describe('meetergo MCP tool surface', () => {
       'delete_communication',
       'delete_company',
       'delete_contact',
+      'delete_data_field',
       'delete_deal',
       'delete_knowledge_document',
       'delete_meeting_type',
       'delete_note',
+      'delete_pipeline',
+      'delete_pipeline_stage',
       'delete_routing_form',
       'delete_task',
       'delete_webhook',
@@ -142,6 +159,8 @@ describe('meetergo MCP tool surface', () => {
       'send_routing_form',
       'update_appointment_notes',
       'update_contact',
+      'update_custom_field_definitions',
+      'update_lost_reasons',
       'update_meeting_transcription',
       'update_meeting_type',
       'update_mira_settings',
@@ -276,6 +295,10 @@ describe('meetergo MCP tool surface', () => {
       'taskId',
       'dealContactId',
       'contactIds',
+      'pipelineId',
+      'stageId',
+      'fieldId',
+      'fieldIds',
     ]
     // Company-scoped singletons: there is exactly one target (the caller's own
     // page / the company's Mira config / its knowledge base), so no id exists.
@@ -290,6 +313,10 @@ describe('meetergo MCP tool surface', () => {
       // Runs against the company's one saved widget config; the only thing it
       // writes is that run's own verdict.
       'run_test_drive',
+      // Full replaces of one company-wide settings singleton (all custom
+      // field definitions / all lost-deal reasons), not a specific record.
+      'update_custom_field_definitions',
+      'update_lost_reasons',
     ])
 
     for (const tool of TOOLS.filter(
@@ -536,6 +563,113 @@ describe('wire format', () => {
       const call = await callTool(name, args)
       expect(call.options.root, `${name} must target the host root`).toBe(true)
     }
+  })
+
+  it('manages pipelines and their stages on the confirmed CRUD endpoints', async () => {
+    const createdPipeline = await callTool('create_pipeline', { name: 'Zweitvertrieb' })
+    expect(createdPipeline).toMatchObject({ method: 'POST', path: '/crm/pipelines' })
+    expect(createdPipeline.options.root).toBe(true)
+
+    const updatedPipeline = await callTool('update_pipeline', { pipelineId: 'p-1', isDefault: true })
+    expect(updatedPipeline).toMatchObject({ method: 'PATCH', path: '/crm/pipelines/p-1' })
+    expect(updatedPipeline.options.body).toEqual({ isDefault: true })
+
+    const deletedPipeline = await callTool('delete_pipeline', { pipelineId: 'p-1' })
+    expect(deletedPipeline).toMatchObject({ method: 'DELETE', path: '/crm/pipelines/p-1' })
+
+    const addedStage = await callTool('add_pipeline_stage', {
+      pipelineId: 'p-1',
+      name: 'Demo',
+      color: '#00ff00',
+      salesMilestone: 'demo',
+    })
+    expect(addedStage).toMatchObject({ method: 'POST', path: '/crm/pipelines/p-1/stages' })
+    expect(addedStage.options.body).toMatchObject({ name: 'Demo', color: '#00ff00', salesMilestone: 'demo' })
+    expect(addedStage.options.body).not.toHaveProperty('pipelineId')
+
+    const updatedStage = await callTool('update_pipeline_stage', {
+      pipelineId: 'p-1',
+      stageId: 's-1',
+      salesMilestone: 'offer',
+    })
+    expect(updatedStage).toMatchObject({ method: 'PATCH', path: '/crm/pipelines/p-1/stages/s-1' })
+    expect(updatedStage.options.body).toEqual({ salesMilestone: 'offer' })
+
+    const deletedStage = await callTool('delete_pipeline_stage', {
+      pipelineId: 'p-1',
+      stageId: 's-1',
+      moveToStageId: 's-2',
+    })
+    expect(deletedStage).toMatchObject({ method: 'DELETE', path: '/crm/pipelines/p-1/stages/s-1' })
+    expect(deletedStage.options.query).toMatchObject({ moveToStageId: 's-2' })
+
+    const reordered = await callTool('reorder_pipeline_stages', {
+      pipelineId: 'p-1',
+      stageIds: ['s-2', 's-1'],
+    })
+    expect(reordered).toMatchObject({ method: 'PATCH', path: '/crm/pipelines/p-1/stages/reorder' })
+    expect(reordered.options.body).toEqual({ stageIds: ['s-2', 's-1'] })
+  })
+
+  it('updates notes and communications on their own PATCH endpoints', async () => {
+    const note = await callTool('update_note', { noteId: 'note-1', isPinned: true })
+    expect(note).toMatchObject({ method: 'PATCH', path: '/crm/notes/note-1' })
+    expect(note.options.root).toBe(true)
+    expect(note.options.body).toEqual({ isPinned: true })
+
+    const comm = await callTool('update_communication', {
+      communicationId: 'comm-1',
+      outcome: 'connected',
+    })
+    expect(comm).toMatchObject({ method: 'PATCH', path: '/crm/communications/comm-1' })
+    expect(comm.options.root).toBe(true)
+    expect(comm.options.body).toEqual({ outcome: 'connected' })
+  })
+
+  it('reads and replaces lost-deal reasons and custom field definitions', async () => {
+    const got = await callTool('get_lost_reasons')
+    expect(got).toMatchObject({ method: 'GET', path: '/crm/settings/lost-reasons' })
+    expect(got.options.root).toBe(true)
+
+    const updatedReasons = await callTool('update_lost_reasons', {
+      reasons: [{ key: 'budget' }],
+      required: true,
+    })
+    expect(updatedReasons).toMatchObject({ method: 'PUT', path: '/crm/settings/lost-reasons' })
+    expect(updatedReasons.options.body).toEqual({ reasons: [{ key: 'budget' }], required: true })
+
+    const updatedFields = await callTool('update_custom_field_definitions', {
+      recordType: 'company',
+      fields: [{ id: 'f-1', key: 'netzwerk', label: 'Netzwerk', type: 'multiselect', required: false, order: 0 }],
+    })
+    expect(updatedFields).toMatchObject({ method: 'PUT', path: '/crm/settings/custom-fields' })
+    expect(updatedFields.options.query).toMatchObject({ recordType: 'company' })
+    expect(updatedFields.options.body).toMatchObject({
+      fields: [{ id: 'f-1', key: 'netzwerk' }],
+    })
+  })
+
+  it('manages data fields beyond create/list, keyed by numeric fieldId', async () => {
+    const updated = await callTool('update_data_field', { fieldId: 42, label: 'Neuer Name' })
+    expect(updated).toMatchObject({ method: 'PATCH', path: '/data-field/42' })
+    expect(updated.options.root).toBeUndefined()
+    expect(updated.options.body).toEqual({ label: 'Neuer Name' })
+
+    const usage = await callTool('get_data_field_usage', { fieldId: 42 })
+    expect(usage).toMatchObject({ method: 'GET', path: '/data-field/42/usage' })
+
+    const deleted = await callTool('delete_data_field', { fieldId: 42 })
+    expect(deleted).toMatchObject({ method: 'DELETE', path: '/data-field/42' })
+
+    const reordered = await callTool('reorder_data_fields', { fieldIds: [3, 1, 2] })
+    expect(reordered).toMatchObject({ method: 'PATCH', path: '/data-field/reorder' })
+    expect(reordered.options.body).toEqual({ fieldIds: [3, 1, 2] })
+  })
+
+  it("reads a deal's appointments", async () => {
+    const call = await callTool('get_deal_appointments', { dealId: 'd-1' })
+    expect(call).toMatchObject({ method: 'GET', path: '/crm/deals/d-1/appointments' })
+    expect(call.options.root).toBe(true)
   })
 
   it('creates a deal against the pipeline/stage the caller chose', async () => {
