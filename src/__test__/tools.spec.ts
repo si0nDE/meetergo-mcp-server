@@ -8,7 +8,7 @@ import { TOOLS, sanitizeMiraSettingsForPatch } from '../tools.js'
  */
 describe('meetergo MCP tool surface', () => {
   it('covers the API surface an agent needs, with no duplicate names', () => {
-    expect(TOOLS).toHaveLength(79)
+    expect(TOOLS).toHaveLength(88)
     expect(new Set(TOOLS.map((t) => t.name)).size).toBe(TOOLS.length)
   })
 
@@ -62,9 +62,11 @@ describe('meetergo MCP tool surface', () => {
       'create_data_field',
       'create_deal',
       'create_meeting_type',
+      'create_note',
       'create_one_time_booking_link',
       'create_qualification_form',
       'create_routing_form',
+      'create_task',
       'create_webhook',
       'delete_communication',
       'delete_company',
@@ -72,7 +74,9 @@ describe('meetergo MCP tool surface', () => {
       'delete_deal',
       'delete_knowledge_document',
       'delete_meeting_type',
+      'delete_note',
       'delete_routing_form',
+      'delete_task',
       'delete_webhook',
       'import_booking_page',
       'mark_deal_lost',
@@ -95,6 +99,7 @@ describe('meetergo MCP tool surface', () => {
       'update_mira_settings',
       'update_personal_page',
       'update_routing_form',
+      'update_task',
       'update_webhook',
     ])
   })
@@ -116,7 +121,9 @@ describe('meetergo MCP tool surface', () => {
       'delete_deal',
       'delete_knowledge_document',
       'delete_meeting_type',
+      'delete_note',
       'delete_routing_form',
+      'delete_task',
       'delete_webhook',
       'reschedule_appointment',
       'restore_mira_settings',
@@ -251,6 +258,8 @@ describe('meetergo MCP tool surface', () => {
       'dealId',
       'crmCompanyId',
       'communicationId',
+      'noteId',
+      'taskId',
     ]
     // Company-scoped singletons: there is exactly one target (the caller's own
     // page / the company's Mira config / its knowledge base), so no id exists.
@@ -657,6 +666,80 @@ describe('wire format', () => {
 
     const deleted = await callTool('delete_communication', { communicationId: 'comm-1' })
     expect(deleted).toMatchObject({ method: 'DELETE', path: '/crm/communications/comm-1' })
+    expect(deleted.options.root).toBe(true)
+  })
+
+  it('routes note tools to the host root, on the company-scoped path', async () => {
+    const list = await callTool('list_company_notes', { crmCompanyId: 'co-1' })
+    expect(list).toMatchObject({ method: 'GET', path: '/crm/companies/co-1/notes' })
+    expect(list.options.root).toBe(true)
+
+    const created = await callTool('create_note', {
+      crmCompanyId: 'co-1',
+      content: 'Testnotiz',
+    })
+    expect(created).toMatchObject({ method: 'POST', path: '/crm/notes' })
+    expect(created.options.root).toBe(true)
+    expect(created.options.body).toMatchObject({ crmCompanyId: 'co-1', content: 'Testnotiz' })
+
+    const deleted = await callTool('delete_note', { noteId: 'note-1' })
+    expect(deleted).toMatchObject({ method: 'DELETE', path: '/crm/notes/note-1' })
+    expect(deleted.options.root).toBe(true)
+  })
+
+  it('rejects create_note unless exactly one of crmCompanyId, contactId or dealId is given', async () => {
+    // The API itself enforces this ("Exactly one of dealId, contactId, or
+    // crmCompanyId must be provided") — catching it here means a 400 doesn't
+    // read as a broken tool.
+    const tool = TOOLS.find((t) => t.name === 'create_note')!
+    const { client } = record()
+    await expect(tool.run(client, { content: 'hi' })).rejects.toThrow(
+      /exactly one of crmCompanyId, contactId or dealId/i,
+    )
+    await expect(
+      tool.run(client, { content: 'hi', crmCompanyId: 'co-1', dealId: 'd-1' }),
+    ).rejects.toThrow(/exactly one of crmCompanyId, contactId or dealId/i)
+  })
+
+  it('reads company attachments on the nested path, at the host root', async () => {
+    const call = await callTool('list_attachments', { crmCompanyId: 'co-1' })
+    expect(call).toMatchObject({ method: 'GET', path: '/crm/companies/co-1/attachments' })
+    expect(call.options.root).toBe(true)
+  })
+
+  it('routes task tools to the host root, on /crm/tasks', async () => {
+    const list = await callTool('list_tasks', { page: 1, limit: 20 })
+    expect(list).toMatchObject({ method: 'GET', path: '/crm/tasks' })
+    expect(list.options.root).toBe(true)
+    expect(list.options.query).toMatchObject({ page: 1, limit: 20 })
+
+    const got = await callTool('get_task', { taskId: 'task-1' })
+    expect(got).toMatchObject({ method: 'GET', path: '/crm/tasks/task-1' })
+    expect(got.options.root).toBe(true)
+
+    const created = await callTool('create_task', {
+      title: 'Testaufgabe',
+      type: 'call',
+      dueDate: '2026-10-01T09:00:00.000Z',
+      crmCompanyId: 'co-1',
+    })
+    expect(created).toMatchObject({ method: 'POST', path: '/crm/tasks' })
+    expect(created.options.root).toBe(true)
+    expect(created.options.body).toMatchObject({
+      title: 'Testaufgabe',
+      type: 'call',
+      dueDate: '2026-10-01T09:00:00.000Z',
+      crmCompanyId: 'co-1',
+    })
+
+    const updated = await callTool('update_task', { taskId: 'task-1', title: 'Neuer Titel' })
+    expect(updated).toMatchObject({ method: 'PATCH', path: '/crm/tasks/task-1' })
+    expect(updated.options.root).toBe(true)
+    expect(updated.options.body).toMatchObject({ title: 'Neuer Titel' })
+    expect(updated.options.body).not.toHaveProperty('taskId')
+
+    const deleted = await callTool('delete_task', { taskId: 'task-1' })
+    expect(deleted).toMatchObject({ method: 'DELETE', path: '/crm/tasks/task-1' })
     expect(deleted.options.root).toBe(true)
   })
 

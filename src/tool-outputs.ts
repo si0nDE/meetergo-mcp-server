@@ -225,6 +225,48 @@ const communication = out(
   'A logged communication (WhatsApp, email, call or SMS) on a deal',
 )
 
+const note = out(
+  {
+    id: str,
+    content: str,
+    isPinned: bool,
+    dealId: str,
+    contactId: str,
+    crmCompanyId: str,
+    authorId: str,
+    createdAt: str,
+    updatedAt: str,
+  },
+  'A note logged against a company, contact or deal',
+)
+
+const task = out(
+  {
+    id: str.describe('The taskId other tools take'),
+    title: str,
+    description: str,
+    type: str.describe('e.g. call, follow_up, email or meeting'),
+    priority: str,
+    dueDate: str,
+    reminderAt: str,
+    completed: bool.describe('Always false in practice: no confirmed way to set it true'),
+    completedAt: str,
+    assigneeId: str,
+    companyId: str.describe("The meetergo tenant's own account id, not the CRM company"),
+    crmCompanyId: str.describe('The linked CRM company, when set'),
+    isOverdue: bool,
+    crmCompany: record.nullable().optional(),
+    assignee: record.nullable().optional(),
+    createdAt: str,
+    updatedAt: str,
+  },
+  'A CRM task',
+)
+
+// Never observed populated during research — every company checked had an
+// empty attachments list — so the shape of a real entry is unconfirmed.
+const attachment = record.describe('An attachment on a company; fields unconfirmed, never seen populated')
+
 const dealActivity = out(
   {
     id: str,
@@ -615,6 +657,24 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
   get_deal_communications: listOf(communication, "A deal's logged communications"),
   create_communication: communication,
   delete_communication: ok,
+  list_company_notes: listOf(note, "A company's logged notes"),
+  create_note: note,
+  delete_note: ok,
+  list_attachments: listOf(attachment, "A company's attachments"),
+  list_tasks: out(
+    {
+      tasks: list(task),
+      total: any('Total matches'),
+      page: any('Current page'),
+      limit: any('Page size'),
+      totalPages: any('Total pages'),
+    },
+    'Paginated CRM tasks',
+  ),
+  get_task: task,
+  create_task: task,
+  update_task: task,
+  delete_task: ok,
   list_webhooks: listOf(webhook, 'Webhook subscriptions of the company'),
   create_webhook: webhook,
   update_webhook: webhook,

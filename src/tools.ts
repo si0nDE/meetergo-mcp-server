@@ -1641,6 +1641,126 @@ export const TOOLS: ToolDefinition[] = [
       client.request('DELETE', `/crm/communications/${communicationId}`, { root: true }),
   },
 
+  // ---- Notes ------------------------------------------------------------
+  {
+    name: 'list_company_notes',
+    title: "Get a company's notes",
+    description: 'List notes logged against a CRM company, most recent first.',
+    schema: { crmCompanyId: z.string() },
+    readOnly: true,
+    run: (client, { crmCompanyId }) =>
+      client.request('GET', `/crm/companies/${crmCompanyId}/notes`, { root: true }),
+  },
+  {
+    name: 'create_note',
+    title: 'Log a note',
+    description:
+      'Log a note against a CRM company, contact or deal. Exactly one of crmCompanyId, contactId or dealId is required — the API rejects zero or more than one.',
+    schema: {
+      content: z.string(),
+      crmCompanyId: z.string().optional(),
+      contactId: z.string().optional(),
+      dealId: z.string().optional(),
+    },
+    readOnly: false,
+    // async so the guard rejects rather than throwing synchronously, same as
+    // get_contact's contactId/attendeeId check.
+    run: async (client, args) => {
+      const targets = [args.crmCompanyId, args.contactId, args.dealId].filter(Boolean)
+      if (targets.length !== 1) {
+        throw new Error('Provide exactly one of crmCompanyId, contactId or dealId')
+      }
+      return client.request('POST', '/crm/notes', { body: args, root: true })
+    },
+  },
+  {
+    name: 'delete_note',
+    title: 'Delete a note',
+    description: 'Permanently delete a logged note. There is no undo.',
+    schema: { noteId: z.string() },
+    readOnly: false,
+    destructive: true,
+    run: (client, { noteId }) =>
+      client.request('DELETE', `/crm/notes/${noteId}`, { root: true }),
+  },
+
+  // ---- Attachments --------------------------------------------------------
+  {
+    name: 'list_attachments',
+    title: "Get a company's attachments",
+    description:
+      "List attachments on a CRM company. There is no create_attachment yet: the API needs a fileAssetId from an upload step whose endpoint has not been located.",
+    schema: { crmCompanyId: z.string() },
+    readOnly: true,
+    run: (client, { crmCompanyId }) =>
+      client.request('GET', `/crm/companies/${crmCompanyId}/attachments`, { root: true }),
+  },
+
+  // ---- Tasks --------------------------------------------------------------
+  {
+    name: 'list_tasks',
+    title: 'List tasks',
+    description:
+      'List CRM tasks, paginated with page and limit. crmCompanyId scopes to one company; unconfirmed as a server-side filter, but harmless to pass on a GET.',
+    schema: {
+      page: z.number().int().min(1).optional(),
+      limit: z.number().int().min(1).optional(),
+      crmCompanyId: z.string().optional(),
+    },
+    readOnly: true,
+    run: (client, args) => client.request('GET', '/crm/tasks', { query: args, root: true }),
+  },
+  {
+    name: 'get_task',
+    title: 'Get a task',
+    description: 'Return a single CRM task by id, with its assignee and linked company.',
+    schema: { taskId: z.string() },
+    readOnly: true,
+    run: (client, { taskId }) => client.request('GET', `/crm/tasks/${taskId}`, { root: true }),
+  },
+  {
+    name: 'create_task',
+    title: 'Create a task',
+    description:
+      'Create a CRM task. type is checked server-side, not here — confirmed values are call, follow_up, email and meeting, but the API may accept others the server never tried; an invalid value comes back as the API\'s own "type must be a valid enum value".',
+    schema: {
+      title: z.string(),
+      type: z.string().describe('e.g. call, follow_up, email or meeting'),
+      dueDate: z.string().describe('ISO 8601'),
+      description: z.string().optional(),
+      crmCompanyId: z.string().optional(),
+    },
+    readOnly: false,
+    run: (client, body) => client.request('POST', '/crm/tasks', { body, root: true }),
+  },
+  {
+    name: 'update_task',
+    title: 'Update a task',
+    description:
+      'Update a CRM task. Only supplied fields change. Marking a task done is deliberately not offered: completed, status, isCompleted and completedAt were all tested and the API accepts them with HTTP 200 but silently ignores them.',
+    schema: {
+      taskId: z.string(),
+      title: z.string().optional(),
+      type: z.string().optional().describe('e.g. call, follow_up, email or meeting'),
+      dueDate: z.string().optional().describe('ISO 8601'),
+      description: z.string().optional(),
+      crmCompanyId: z.string().optional(),
+    },
+    readOnly: false,
+    run: (client, { taskId, ...body }) =>
+      client.request('PATCH', `/crm/tasks/${taskId}`, { body, root: true }),
+  },
+  {
+    name: 'delete_task',
+    title: 'Delete a task',
+    description: 'Permanently delete a task. There is no undo.',
+    schema: { taskId: z.string() },
+    readOnly: false,
+    destructive: true,
+    run: (client, { taskId }) =>
+      client.request('DELETE', `/crm/tasks/${taskId}`, { root: true }),
+  },
+
   // ---- Webhooks -----------------------------------------------------------
   {
     name: 'list_webhooks',
