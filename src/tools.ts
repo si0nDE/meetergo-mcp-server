@@ -125,6 +125,13 @@ const DEAL_CONTACT_ROLES = [
   'other',
 ] as const
 
+/**
+ * The nested objects list_deals embeds per deal. Each one roughly doubles the
+ * response size on a workspace with real contact/company records, so they are
+ * stripped by default and restored only on request via `expand`.
+ */
+const DEAL_EMBEDDED_FIELDS = ['crmCompany', 'contact', 'stage', 'owner', 'contacts'] as const
+
 const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001+'] as const
 
 const COMMUNICATION_TYPES = ['whatsapp', 'email', 'call', 'sms'] as const
@@ -342,7 +349,7 @@ export const TOOLS: ToolDefinition[] = [
     name: 'get_me',
     title: 'Get the authenticated user',
     description:
-      'Return the authenticated account and, when available, its plan tier and relevant caps. This is a low-cost authentication check that distinguishes a bad token from an empty calendar. Plan data explains action-specific limits; it does not gate the connection itself.',
+      'Return the authenticated account and, when available, its plan tier and relevant caps. This is a low-cost authentication check that distinguishes a bad token from an empty calendar. Plan data explains action-specific limits; it does not gate the connection itself. The account does not change within a session — call this once and reuse the id, name and email rather than calling it again.',
     schema: {},
     readOnly: true,
     run: async (client) => {
@@ -715,9 +722,16 @@ export const TOOLS: ToolDefinition[] = [
     name: 'search_contacts',
     title: 'Search CRM contacts',
     description:
-      'Search the CRM by name, email, phone or tag. Results expose contactIds and support duplicate checks before contact creation.',
+      'Search the CRM by name, email, phone or tag. Results expose contactIds and support duplicate checks before contact creation. searchTerm is a substring match, so a partial email can return contacts you did not mean to match; pass email instead when you have a full address and want only an exact match.',
     schema: {
       searchTerm: z.string().optional().describe('Matches name, email or phone'),
+      email: z
+        .string()
+        .email()
+        .optional()
+        .describe(
+          'Exact, case-insensitive email match for duplicate checks — takes precedence over searchTerm. Only the first page of the underlying search is checked, so a generic address (e.g. info@) that has more matches than fit on one page can still miss the one you want; narrow with tags or ownerId if that happens.',
+        ),
       tags: z.array(z.string()).optional(),
       ownerId: z.string().optional().describe('Filter by account owner'),
       sortBy: z.enum(['firstName', 'lastName', 'email', 'createdAt']).optional(),
@@ -726,8 +740,28 @@ export const TOOLS: ToolDefinition[] = [
       limit: z.number().int().min(1).max(100).optional(),
     },
     readOnly: true,
-    run: (client, args) =>
-      client.request('GET', '/crm', { query: args, root: true }),
+    run: async (client, args) => {
+      const { email, ...rest } = args
+      if (!email) {
+        return client.request('GET', '/crm', { query: rest, root: true })
+      }
+      const result = (await client.request('GET', '/crm', {
+        query: { ...rest, searchTerm: email },
+        root: true,
+      })) as Record<string, unknown>
+      const target = email.toLowerCase()
+      const isExactMatch = (contact: unknown) =>
+        typeof (contact as { email?: unknown }).email === 'string' &&
+        (contact as { email: string }).email.toLowerCase() === target
+      if (Array.isArray(result.items)) {
+        return { ...result, items: result.items.filter(isExactMatch) }
+      }
+      if (Array.isArray(result.data)) {
+        return { ...result, data: result.data.filter(isExactMatch) }
+      }
+      if (Array.isArray(result)) return result.filter(isExactMatch)
+      return result
+    },
   },
   {
     name: 'get_contact',
@@ -1142,7 +1176,7 @@ export const TOOLS: ToolDefinition[] = [
     name: 'list_data_fields',
     title: 'List data fields',
     description:
-      'List the reusable form fields shared across routing forms, including fields that may already match a planned addition. Returns 50 at a time with offset pagination.',
+      "List the reusable form fields shared across routing forms, including fields that may already match a planned addition. Each field's `name` is the exact key any `customFields` write elsewhere expects — match the field by its `label` here, then write using its `name`. Returns 50 at a time with offset pagination.",
     schema: { limit: listLimit, offset: listOffset },
     readOnly: true,
     run: (client, query) => client.request('GET', '/data-field', { query }),
@@ -1230,7 +1264,7 @@ export const TOOLS: ToolDefinition[] = [
     name: 'list_deals',
     title: 'List deals',
     description:
-      'Search and filter deals by pipeline, stage, contact, company, owner or a name match. isOpen, isWon and isLost filter by outcome; paginated with page and limit.',
+      'Search and filter deals by pipeline, stage, contact, company, owner or a name match. isOpen, isWon and isLost filter by outcome; paginated with page and limit. Each deal comes back without its embedded company, contact, stage, owner and contact-list objects — pass expand to add specific ones back when you need more than the ids.',
     schema: {
       search: z.string().optional().describe('Matches the deal name'),
       pipelineId: z.string().optional(),
@@ -1245,10 +1279,32 @@ export const TOOLS: ToolDefinition[] = [
       limit: z.number().int().min(1).optional(),
       sortBy: z.string().optional(),
       sortOrder: z.enum(['ASC', 'DESC']).optional(),
+      expand: z
+        .array(z.enum(DEAL_EMBEDDED_FIELDS))
+        .optional()
+        .describe(
+          'Which embedded objects to keep on each deal (crmCompany, contact, stage, owner, contacts). Omitted ones are stripped to keep the response small.',
+        ),
     },
     readOnly: true,
-    run: (client, args) =>
-      client.request('GET', '/crm/deals', { query: args, root: true }),
+    run: async (client, args) => {
+      const { expand, ...query } = args
+      const result = (await client.request('GET', '/crm/deals', {
+        query,
+        root: true,
+      })) as Record<string, unknown>
+      const keep = new Set(expand ?? [])
+      const strip = DEAL_EMBEDDED_FIELDS.filter((field) => !keep.has(field))
+      if (!Array.isArray(result.deals) || strip.length === 0) return result
+      return {
+        ...result,
+        deals: result.deals.map((deal: Record<string, unknown>) => {
+          const trimmed = { ...deal }
+          for (const field of strip) delete trimmed[field]
+          return trimmed
+        }),
+      }
+    },
   },
   {
     name: 'get_deal',

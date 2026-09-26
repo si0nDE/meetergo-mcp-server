@@ -660,6 +660,71 @@ describe('wire format', () => {
     expect(deleted.options.root).toBe(true)
   })
 
+  it('filters search_contacts to an exact, case-insensitive email match', async () => {
+    // A generic searchTerm substring-matches; email is for a caller who has a
+    // full address and wants exactly that contact, not near-misses.
+    const tool = TOOLS.find((t) => t.name === 'search_contacts')!
+    const { client, calls } = record({
+      '/crm': {
+        items: [
+          { id: 'c-1', email: 'Info@Example.com' },
+          { id: 'c-2', email: 'info@example.com.br' },
+        ],
+      },
+    })
+    const result = await tool.run(client, { email: 'info@example.com' })
+    expect(calls[0].options.query).toMatchObject({ searchTerm: 'info@example.com' })
+    expect(calls[0].options.query).not.toHaveProperty('email')
+    expect(result).toMatchObject({ items: [{ id: 'c-1' }] })
+  })
+
+  it('leaves search_contacts on plain searchTerm when no email filter is given', async () => {
+    const call = await callTool('search_contacts', { searchTerm: 'Ada' })
+    expect(call.options.query).toMatchObject({ searchTerm: 'Ada' })
+    expect(call.options.query).not.toHaveProperty('email')
+  })
+
+  it('strips embedded deal objects from list_deals by default', async () => {
+    // crmCompany/contact/stage/owner/contacts roughly double the payload size
+    // on a workspace with real records; stripped unless asked for.
+    const tool = TOOLS.find((t) => t.name === 'list_deals')!
+    const rawDeal = {
+      id: 'd-1',
+      name: 'Muster GmbH',
+      crmCompany: { id: 'co-1' },
+      contact: { id: 'c-1' },
+      stage: { id: 's-1' },
+      owner: { id: 'u-1' },
+      contacts: [{ contactId: 'c-1' }],
+    }
+    const { client } = record({ '/crm/deals': { deals: [rawDeal], total: 1 } })
+    const result = (await tool.run(client, {})) as { deals: Record<string, unknown>[] }
+    expect(result.deals[0]).toMatchObject({ id: 'd-1', name: 'Muster GmbH' })
+    for (const field of ['crmCompany', 'contact', 'stage', 'owner', 'contacts']) {
+      expect(result.deals[0]).not.toHaveProperty(field)
+    }
+  })
+
+  it('restores only the requested embedded objects on list_deals via expand', async () => {
+    const tool = TOOLS.find((t) => t.name === 'list_deals')!
+    const rawDeal = {
+      id: 'd-1',
+      crmCompany: { id: 'co-1' },
+      contact: { id: 'c-1' },
+    }
+    const { client } = record({ '/crm/deals': { deals: [rawDeal], total: 1 } })
+    const result = (await tool.run(client, { expand: ['crmCompany'] })) as {
+      deals: Record<string, unknown>[]
+    }
+    expect(result.deals[0]).toHaveProperty('crmCompany')
+    expect(result.deals[0]).not.toHaveProperty('contact')
+  })
+
+  it('does not forward expand as a list_deals query param', async () => {
+    const call = await callTool('list_deals', { expand: ['owner'] }, {})
+    expect(call.options.query).not.toHaveProperty('expand')
+  })
+
   it('keeps scheduling tools on the versioned base', async () => {
     for (const name of [
       'get_me',

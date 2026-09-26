@@ -262,7 +262,7 @@ const dataField = out(
   {
     id: str,
     label: str,
-    name: str.describe('Internal key'),
+    name: str.describe('The exact key customFields expects when writing to this field'),
     fieldType: str,
     required: bool,
     options: any('Choices, for choice fields'),
