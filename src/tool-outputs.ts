@@ -32,6 +32,7 @@ import { SPACES_OUTPUTS } from './tools-spaces.js'
 import { ENGAGEMENT_OUTPUTS } from './tools-engagement.js'
 import { BOOKING_SETUP_OUTPUTS } from './tools-booking-setup.js'
 import { INVOICING_OUTPUTS } from './tools-invoicing.js'
+import { PLAN_OUTPUTS } from './plan-access.js'
 
 const ok = out(
   {
@@ -1130,6 +1131,7 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
   ...ENGAGEMENT_OUTPUTS,
   ...BOOKING_SETUP_OUTPUTS,
   ...INVOICING_OUTPUTS,
+  ...PLAN_OUTPUTS,
 }
 
 /**

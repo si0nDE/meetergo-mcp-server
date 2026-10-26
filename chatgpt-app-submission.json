@@ -2335,6 +2335,18 @@
         "open_world_justification": "Can reach people outside the account (mail, WhatsApp, a shared link or a customer-facing document); the description requires the user's confirmation first.",
         "destructive_justification": "Can remove or irreversibly change existing data; the description requires the user's confirmation first."
       }
+    },
+    "check_plan_access": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Reports which optional areas the account's plan includes. It does not create, update or delete anything.",
+        "open_world_justification": "Operates only on this account's own private data in meetergo.",
+        "destructive_justification": "Read-only; nothing is changed or removed."
+      }
     }
   },
   "test_cases": [

@@ -11,6 +11,7 @@ import { z } from 'zod/v3'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import { MeetergoApiError, type MeetergoClient } from './client.js'
 import { PROMPTS } from './prompts.js'
+import { explainDeniedAccess } from './plan-access.js'
 import { TOOL_OUTPUTS, toStructuredContent } from './tool-outputs.js'
 import { TOOLS, type ToolDefinition } from './tools.js'
 import {
@@ -139,10 +140,13 @@ export function buildServer(
           // Returned as an error result, not thrown: the agent should be able
           // to read "that slot was taken" and pick another, rather than have
           // the whole tool call fail opaquely.
+          // A refusal caused by a feature the plan lacks is reported as exactly
+          // that, so the agent can say "not booked" instead of "forbidden".
           const message =
-            error instanceof MeetergoApiError
+            (await explainDeniedAccess(client, tool.name, error)) ??
+            (error instanceof MeetergoApiError
               ? error.message
-              : `meetergo MCP: ${(error as Error).message}`
+              : `meetergo MCP: ${(error as Error).message}`)
           return {
             isError: true,
             content: [{ type: 'text' as const, text: message }],

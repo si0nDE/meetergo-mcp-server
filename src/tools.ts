@@ -9,6 +9,7 @@ import { SPACES_TOOLS } from './tools-spaces.js'
 import { ENGAGEMENT_TOOLS } from './tools-engagement.js'
 import { BOOKING_SETUP_TOOLS } from './tools-booking-setup.js'
 import { INVOICING_TOOLS } from './tools-invoicing.js'
+import { PLAN_TOOLS } from './plan-access.js'
 import {
   analyzeInstallHtml,
   deriveSetupStatus,
@@ -3716,4 +3717,5 @@ export const TOOLS: ToolDefinition[] = [
   ...ENGAGEMENT_TOOLS,
   ...BOOKING_SETUP_TOOLS,
   ...INVOICING_TOOLS,
+  ...PLAN_TOOLS,
 ]

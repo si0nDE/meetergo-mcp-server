@@ -10,7 +10,7 @@ change anything. Both are useful and they do different jobs:
 | | Docs MCP | This server |
 |---|---|---|
 | Endpoint | `developer.meetergo.com/mcp` | `mcp.meetergo.com/mcp`, or `npx` over stdio |
-| Tools | `SearchMeetergo` | 194 scheduling, CRM, Mira and config tools |
+| Tools | `SearchMeetergo` | 195 scheduling, CRM, Mira and config tools |
 | Can it book? | No | **Yes** |
 | Use it to | write an integration | be the integration |
 
@@ -203,7 +203,7 @@ server itself is never gated — a token from any plan, including Free, works.
 
 ## Tools
 
-194 tools, covering scheduling end to end. **Scheduling** is the loop most agents
+195 tools, covering scheduling end to end. **Scheduling** is the loop most agents
 live in; the rest is there so an agent never has to fall back to raw REST.
 
 ### Scheduling
@@ -211,6 +211,7 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 | Tool | Writes? | Purpose |
 |---|---|---|
 | `get_me` | | Confirm the token works — start here when something looks empty |
+| `check_plan_access` | | Which optional areas the plan includes (Round Robin, Handoff, WhatsApp add-on, templates, routing forms, invoicing, Spaces) — ask before attempting something that may not be booked |
 | `list_meeting_types` | | What can be booked |
 | `get_availability` | | Bookable slots for a meeting type |
 | `book_appointment` | **yes** | Book a slot |
@@ -631,6 +632,12 @@ boilerplate in a docstring and hoping, the tools supply it:
   it from the machine when the model gives none.
 - **`create_data_field`** fills the required-but-irrelevant `target`, `default`,
   `required` and `hidden` when they are not given.
+- **Plan walls** (Round Robin queues, Handoff, WhatsApp add-on, templates, …) answer
+  a bare `403 Forbidden resource`. When a mapped tool is refused, the server
+  reads `company.featureAccess` once and replies with the exact statement —
+  *not booked: <feature>, plan <tier>, nothing was changed* — instead of a
+  generic error. The check runs only after a refusal, never as a gate in front
+  of a call, because some reads work even when the flag is off.
 - **Sending, finalizing and cancelling tools** (invoicing, WhatsApp, e-signature,
   published Spaces) are annotated as reaching outside meetergo or as
   destructive, and their descriptions tell the agent to confirm with you first.
