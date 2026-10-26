@@ -111,7 +111,7 @@ export const BOOKING_SETUP_TOOLS: ToolDefinition[] = [
     name: 'save_meeting_type_template',
     title: 'Create or update a meeting type template',
     description:
-      'Create a template (no templateId; needs name, description, duration, channel) or change one (with templateId; only sent fields change). Updates propagate to meeting types already made from the template, so confirm first.',
+      'Create a template (no templateId; needs name, description, duration, channel) or change one (with templateId; only sent fields change). Updates propagate to meeting types already made from the template, so confirm first. Needs the meeting-type templates plan feature (featureAccess.meetingTypeTemplates).',
     schema: {
       templateId: z.string().optional().describe('Set to update. Omit to create.'),
       ...templateShape,
@@ -178,7 +178,7 @@ export const BOOKING_SETUP_TOOLS: ToolDefinition[] = [
     name: 'assign_meeting_type_template',
     title: 'Assign or unassign a template',
     description:
-      'assign_host / assign_hosts (up to 100) give users a meeting type made from the template; assign_workspace does that for a team workspace; unassign removes the template assignment. Creates or removes bookable pages, so confirm first.',
+      'assign_host / assign_hosts (up to 100) give users a meeting type made from the template; assign_workspace does that for a team workspace; unassign removes the template assignment. Creates or removes bookable pages, so confirm first. Needs the meeting-type templates plan feature (featureAccess.meetingTypeTemplates).',
     schema: {
       templateId: z.string(),
       action: z.enum(['assign_host', 'assign_hosts', 'assign_workspace', 'unassign']),
@@ -212,7 +212,7 @@ export const BOOKING_SETUP_TOOLS: ToolDefinition[] = [
   {
     name: 'delete_meeting_type_template',
     title: 'Delete a meeting type template',
-    description: 'Delete a meeting type template. Confirm with the user first.',
+    description: 'Delete a meeting type template. Confirm with the user first. Needs the meeting-type templates plan feature (featureAccess.meetingTypeTemplates).',
     schema: { templateId: z.string() },
     readOnly: false,
     destructive: true,
@@ -226,7 +226,7 @@ export const BOOKING_SETUP_TOOLS: ToolDefinition[] = [
     name: 'list_queues',
     title: 'List round robin queues',
     description:
-      'No arguments: all queues of the company. workspaceId: queues of that workspace. queueId: one queue, or with next the hosts who are next in line.',
+      'No arguments: all queues of the company. workspaceId: queues of that workspace. queueId: one queue, or with next the hosts who are next in line. Needs the Round Robin plan feature (company.featureAccess.roundRobin in the account data); without it the API answers 403.',
     schema: {
       queueId: z.string().optional(),
       workspaceId: z.string().optional(),
@@ -245,7 +245,7 @@ export const BOOKING_SETUP_TOOLS: ToolDefinition[] = [
     name: 'update_queue',
     title: 'Update the queue of a meeting type',
     description:
-      'Change who hosts a round robin meeting type and how bookings are distributed. userIds is the FULL desired host set and replaces the current one, so read the queue first and confirm with the user.',
+      'Change who hosts a round robin meeting type and how bookings are distributed. userIds is the FULL desired host set and replaces the current one, so read the queue first and confirm with the user. Needs the Round Robin plan feature; without it the API answers 403.',
     schema: {
       meetingTypeId: z.string(),
       userIds: z.array(z.string()).optional().describe('Full host set; replaces the current hosts'),
@@ -280,7 +280,7 @@ export const BOOKING_SETUP_TOOLS: ToolDefinition[] = [
     name: 'manage_queue_user_group',
     title: 'Manage a queue user group',
     description:
-      'Create, update or delete a host group inside a queue. update: userIds is the FULL member set and replaces the current one; mainGroupHostId null removes the main host. delete cannot be undone, confirm first.',
+      'Create, update or delete a host group inside a queue. update: userIds is the FULL member set and replaces the current one; mainGroupHostId null removes the main host. delete cannot be undone, confirm first. Needs the Round Robin plan feature; without it the API answers 403.',
     schema: {
       action: z.enum(['create', 'update', 'delete']),
       queueId: z.string().optional().describe('For create'),
@@ -310,12 +310,12 @@ export const BOOKING_SETUP_TOOLS: ToolDefinition[] = [
     name: 'list_booking_links',
     title: 'List booking links',
     description:
-      'Read booking links. scope group: group booking links of a workspace (workspaceId). workspace: personal and workspace links (workspaceId optional, defaults to the user workspace). all: every link with scopes (domain and id). assigned: meeting types on the personal link. meeting_type: link for one host and meeting type (userId, meetingTypeId). personal_page: the personal page link.',
+      'Read booking links. scope group: group booking links of a workspace (workspaceId). workspace: personal and workspace links (workspaceId optional, defaults to the user workspace). all: personal and workspace links of the company; works without arguments and is the one to use when workspace or group answer 500 (domain and id only narrow it). assigned: meeting types on the personal link. meeting_type: link for one host and meeting type (userId, meetingTypeId). personal_page: the personal page link.',
     schema: {
       scope: z.enum(['group', 'workspace', 'all', 'assigned', 'meeting_type', 'personal_page']),
       workspaceId: z.string().optional(),
-      domain: z.string().optional().describe('For scope all'),
-      id: z.string().optional().describe('For scope all'),
+      domain: z.string().optional().describe('For scope all, optional'),
+      id: z.string().optional().describe('For scope all, optional'),
       userId: z.string().optional().describe('For scope meeting_type'),
       meetingTypeId: z.string().optional().describe('For scope meeting_type'),
     },
@@ -328,8 +328,7 @@ export const BOOKING_SETUP_TOOLS: ToolDefinition[] = [
         case 'workspace':
           return client.request('GET', '/booking-link', { query: definedOnly({ workspaceId }) })
         case 'all':
-          need(domain && id, 'all needs domain and id')
-          return client.request('GET', '/booking-link/all', { query: { domain, id } })
+          return client.request('GET', '/booking-link/all', { query: definedOnly({ domain, id }) })
         case 'assigned':
           return client.request('GET', '/booking-link/personal-link/assigned')
         case 'meeting_type':

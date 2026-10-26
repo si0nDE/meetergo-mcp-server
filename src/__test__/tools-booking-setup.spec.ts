@@ -234,7 +234,9 @@ describe('booking setup tools', () => {
       expect(await call('list_booking_links', { scope: 'personal_page' })).toEqual([
         ['GET', '/booking-link/personal-page/link'],
       ])
-      await expect(call('list_booking_links', { scope: 'all' })).rejects.toThrow()
+      // Live: the API answers without domain and id, and returns the personal
+      // and workspace links, so they only narrow the result.
+      expect(await call('list_booking_links', { scope: 'all' })).toEqual([['GET', '/booking-link/all', { query: {} }]])
     })
 
     it('creates, updates and deletes group links', async () => {

@@ -66,7 +66,7 @@ export const ENGAGEMENT_TOOLS: ToolDefinition[] = [
     name: 'get_whatsapp',
     title: 'Read WhatsApp data',
     description:
-      'Read WhatsApp data, selected by `view`: senders (business numbers), templates (approved ones are needed outside the 24h window), conversations (newest first; filter by phone/status), conversation (one, needs conversationId; shows windowOpen), messages (of a conversation, newest first) or feed (messages after `since`, oldest first; pass nextSince back to advance).',
+      'Read WhatsApp data, selected by `view`: senders (business numbers), templates (approved ones are needed outside the 24h window), conversations (newest first; filter by phone/status), conversation (one, needs conversationId; shows windowOpen), messages (of a conversation, newest first) or feed (messages after `since`, oldest first; pass nextSince back to advance). Needs the WhatsApp add-on (company.featureAccess.whatsappAddon); without it the API answers 403.',
     schema: {
       view: z.enum(['senders', 'templates', 'conversations', 'conversation', 'messages', 'feed']),
       conversationId: z.string().optional().describe('For view conversation or messages'),
@@ -117,7 +117,7 @@ export const ENGAGEMENT_TOOLS: ToolDefinition[] = [
     name: 'send_whatsapp_message',
     title: 'Send a WhatsApp message',
     description:
-      'Send a WhatsApp message to a phone number or BSUID; the conversation is created or reused. Reaches a third party, so confirm recipient and content with the user first. Free text and media only work while the 24h window is open (see windowOpen on the conversation); otherwise the API returns 403 and an approved template must be sent (list the templates first).',
+      'Send a WhatsApp message to a phone number or BSUID; the conversation is created or reused. Reaches a third party, so confirm recipient and content with the user first. Free text and media only work while the 24h window is open (see windowOpen on the conversation); otherwise the API returns 403 and an approved template must be sent (list the templates first). Needs the WhatsApp add-on (company.featureAccess.whatsappAddon).',
     schema: {
       to: z.string().max(140).describe('Phone number (E.164, e.g. +491234567890) or WhatsApp BSUID'),
       type: z.enum(['text', 'template', 'media']),
@@ -290,7 +290,7 @@ export const ENGAGEMENT_TOOLS: ToolDefinition[] = [
     name: 'list_handoff_options',
     title: 'List handoff targets',
     description:
-      'List the users an appointment (or a channel) can be handed off to, with a blocked reason where a user cannot take it. scope says whether the list is the appointment workspace or the whole company.',
+      'List the users an appointment (or a channel) can be handed off to, with a blocked reason where a user cannot take it. scope says whether the list is the appointment workspace or the whole company. Needs the Handoff plan feature (company.featureAccess.handoff); without it the API answers 403.',
     schema: {
       appointmentId: z.string().optional(),
       channelId: z.string().optional(),
@@ -305,7 +305,7 @@ export const ENGAGEMENT_TOOLS: ToolDefinition[] = [
     name: 'handoff_appointments',
     title: 'Hand off appointments',
     description:
-      'Change the host of appointments. Single: appointmentId plus exactly one of userId, queueId, queueGroupId. Bulk: fromUserIds + start + end (all their appointments in that period) plus targetUserId or targetUserIds (round-robin), optionally narrowed with appointmentIds; returns success and conflict ids. Hosts and attendees are affected, so confirm with the user first.',
+      'Change the host of appointments. Single: appointmentId plus exactly one of userId, queueId, queueGroupId. Bulk: fromUserIds + start + end (all their appointments in that period) plus targetUserId or targetUserIds (round-robin), optionally narrowed with appointmentIds; returns success and conflict ids. Hosts and attendees are affected, so confirm with the user first. Needs the Handoff plan feature (company.featureAccess.handoff); without it the API answers 403.',
     schema: {
       appointmentId: z.string().optional().describe('Single mode'),
       userId: z.string().optional().describe('Single mode: new host'),

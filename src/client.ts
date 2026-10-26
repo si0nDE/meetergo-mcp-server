@@ -320,6 +320,13 @@ export class MeetergoClient {
             `${this.dashboardUrl}/admin/subscription?feature=${encodeURIComponent(feature)}&utm_source=mcp`,
           )
         }
+        // A bare "Forbidden resource" is the API's answer to a role or plan
+        // wall (queues and handoff need Round Robin/Handoff, templates need
+        // their own feature). Say so, or it reads as a broken token.
+        if (response.status === 403 && /^forbidden resource$/i.test(message.trim())) {
+          message +=
+            ' — the role or plan of this account does not allow this. company.featureAccess in the account data shows what the plan includes (e.g. roundRobin, handoff, meetingTypeTemplates).'
+        }
         throw new MeetergoApiError(
           response.status,
           message || response.statusText,
