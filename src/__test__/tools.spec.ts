@@ -2631,3 +2631,39 @@ describe('Non-CRM fields added from the v2 spec', () => {
     expect(updated.options.body).toEqual({ hidden: true, placeholder: 'p' })
   })
 })
+
+describe('data-field key handling (found live)', () => {
+  const runCreate = async (args: Record<string, unknown>, created: Record<string, unknown>) => {
+    const tool = TOOLS.find((t) => t.name === 'create_data_field')!
+    const { client, calls } = record({ '/data-field': created })
+    await tool.run(client, args)
+    return calls
+  }
+
+  it('sets the requested name with an update, because create ignores it', async () => {
+    const calls = await runCreate(
+      { label: 'L', fieldType: 'text-single', name: 'zzMcpTest' },
+      { id: 322724, name: 'newDataField_110' },
+    )
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(['POST /data-field', 'PATCH /data-field/322724'])
+    expect(calls[1].options.body).toEqual({ name: 'zzMcpTest' })
+  })
+
+  it('does not update when the API already used the requested name, or none was requested', async () => {
+    const same = await runCreate({ label: 'L', fieldType: 'text-single', name: 'k' }, { id: 1, name: 'k' })
+    expect(same).toHaveLength(1)
+    const none = await runCreate({ label: 'L', fieldType: 'text-single' }, { id: 2, name: 'newDataField_3' })
+    expect(none).toHaveLength(1)
+  })
+
+  it('set_contact_source_type renames the field it had to create', async () => {
+    const tool = TOOLS.find((t) => t.name === 'set_contact_source_type')!
+    const { client, calls } = record({
+      '/data-field': { id: 9, name: 'newDataField_1' },
+    })
+    await tool.run(client, { contactId: 'c-1', value: 'network_contact' })
+    const paths = calls.map((c) => `${c.method} ${c.path}`)
+    expect(paths).toContain('PATCH /data-field/9')
+    expect(calls.find((c) => c.path === '/data-field/9')!.options.body).toEqual({ name: 'contactSourceType' })
+  })
+})

@@ -30,6 +30,28 @@ function client(overrides: Partial<{ token: string; userId: string; baseUrl: str
   return new MeetergoClient({ token: 'rgo-test', ...overrides })
 }
 
+describe('non-JSON responses', () => {
+  it('returns a text/plain body as a string, as the personal-page link endpoint sends it', async () => {
+    const stub = stubFetch([
+      new Response('https://my.meetergo.com/p/x', { status: 200, headers: { 'content-type': 'text/plain' } }),
+    ])
+    try {
+      await expect(client().request('GET', '/booking-link/personal-page/link')).resolves.toBe('https://my.meetergo.com/p/x')
+    } finally {
+      stub.restore()
+    }
+  })
+
+  it('still fails on a body that claims to be JSON but is not', async () => {
+    const stub = stubFetch([new Response('<html>', { status: 200, headers: { 'content-type': 'application/json' } })])
+    try {
+      await expect(client().request('GET', '/x')).rejects.toThrow()
+    } finally {
+      stub.restore()
+    }
+  })
+})
+
 describe('parseRetryAfter', () => {
   it('reads a delay in seconds', () => {
     expect(parseRetryAfter('2')).toBe(2000)

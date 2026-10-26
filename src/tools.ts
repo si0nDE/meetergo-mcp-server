@@ -577,6 +577,28 @@ async function resolveHostScope(
   )
 }
 
+/**
+ * POST /data-field with the fields the spec lists as required on create. The
+ * API assigns its own key (newDataField_N) and silently ignores a requested
+ * `name` on create — live-confirmed — so a wanted name is set with an update
+ * straight after. Without that, everything that later writes under the
+ * requested key (additionalData, customFields) lands on a field that does
+ * not exist.
+ */
+async function createDataField(
+  client: MeetergoClient,
+  body: Record<string, unknown>,
+): Promise<unknown> {
+  const created = await client.request<Record<string, unknown> | undefined>('POST', '/data-field', {
+    body: { target: 'other', default: false, required: false, hidden: false, ...definedOnly(body) },
+  })
+  const wanted = body.name
+  if (typeof wanted === 'string' && created && created.id !== undefined && created.name !== wanted) {
+    return client.request('PATCH', `/data-field/${created.id}`, { body: { name: wanted } })
+  }
+  return created
+}
+
 export const TOOLS: ToolDefinition[] = [
   {
     name: 'get_me',
@@ -1282,13 +1304,11 @@ export const TOOLS: ToolDefinition[] = [
 
       let fieldCreated = false
       if (!fieldExists) {
-        await client.request('POST', '/data-field', {
-          body: {
-            label,
-            fieldType: 'select',
-            name: field,
-            options: options.map((value) => ({ label: value, value })),
-          },
+        await createDataField(client, {
+          label,
+          fieldType: 'select',
+          name: field,
+          options: options.map((value) => ({ label: value, value })),
         })
         fieldCreated = true
       }
@@ -1748,10 +1768,7 @@ export const TOOLS: ToolDefinition[] = [
     readOnly: false,
     // The API lists target, default, required and hidden as required on create;
     // fill the neutral values so the model need not know.
-    run: (client, body) =>
-      client.request('POST', '/data-field', {
-        body: { target: 'other', default: false, required: false, hidden: false, ...definedOnly(body) },
-      }),
+    run: (client, body) => createDataField(client, body),
   },
   {
     name: 'update_data_field',

@@ -344,7 +344,15 @@ export class MeetergoClient {
       }
 
       if (!text) return undefined as T
-      return JSON.parse(text) as T
+      try {
+        return JSON.parse(text) as T
+      } catch (error) {
+        // A few endpoints answer with a bare string (the personal-page link is
+        // a URL sent as text/plain). Only a JSON content type makes unparsable
+        // text a real error.
+        if (!/json/i.test(response.headers.get('content-type') ?? '')) return text as T
+        throw error
+      }
     }
 
     // Unreachable: the final attempt either returns or throws above.
