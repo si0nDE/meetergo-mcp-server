@@ -246,6 +246,7 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 |---|---|---|
 | `get_personal_page` | | Colours, header, links, meeting-type order |
 | `update_personal_page` | **yes** | Change branding |
+| `import_booking_page` | **yes** | Recreate a public booking page (e.g. from Calendly) as meeting types, from its URL |
 
 ### Routing forms
 
@@ -430,6 +431,10 @@ path it reads.
 |---|---|---|
 | `list_attachments` | | Attachments on a company, deal or contact (same one-of-three scoping as notes) |
 
+Editing, deleting and fetching a download link for an existing attachment
+(`update_attachment`, `delete_attachment`, `get_attachment_download_url`) are
+listed under [meetergo Docs and attachments](#meetergo-docs-and-attachments).
+
 There is no `create_attachment` yet: the API expects a `fileAssetId` from an
 upload step whose endpoint hasn't been found. A company-scoped upload route
 that looked promising (`POST /crm/companies/{id}/attachments`) turned out to
@@ -505,7 +510,7 @@ agent removes something a human would miss.
 
 Pages and spreadsheets in meetergo Docs, optionally linked to a CRM contact, and edits to CRM attachments.
 
-| Tool | Writes? | What it does |
+| Tool | Writes? | Purpose |
 |---|---|---|
 | `list_documents` |  | List pages and spreadsheets in meetergo Docs, compact rows without content (open a single document for that). |
 | `get_document` |  | Load one page or spreadsheet. |
@@ -520,7 +525,7 @@ Pages and spreadsheets in meetergo Docs, optionally linked to a CRM contact, and
 
 Weekly working-hours schedules and their exceptions. Not the free-slot lookup `get_availability`.
 
-| Tool | Writes? | What it does |
+| Tool | Writes? | Purpose |
 |---|---|---|
 | `get_availability_schedule` |  | Read weekly working-hours schedules (with their exceptions). |
 | `list_availability_exceptions` |  | List date-specific exceptions (holidays, blocked or extra hours): your own, or the company-wide ones that apply to everyone. |
@@ -534,7 +539,7 @@ Weekly working-hours schedules and their exceptions. Not the free-slot lookup `g
 
 Client portals with sections, blocks, share links and invited people.
 
-| Tool | Writes? | What it does |
+| Tool | Writes? | Purpose |
 |---|---|---|
 | `list_spaces` |  | List client portals (kind "spaces"), reusable space templates ("templates"), or saved section templates ("section_templates"). |
 | `get_space` |  | Read one space with its sections and blocks, or via part: its share links, form submissions (form_status), files visitors uploaded (uploads), or invited people. |
@@ -550,7 +555,7 @@ Client portals with sections, blocks, share links and invited people.
 
 Messaging, e-signature requests, provisional bookings, handoffs and post-meeting actions.
 
-| Tool | Writes? | What it does |
+| Tool | Writes? | Purpose |
 |---|---|---|
 | `get_whatsapp` |  | Read WhatsApp data, selected by `view`: senders (business numbers), templates (approved ones are needed outside the 24h window), conversations (newest first; filter by phone/status), conversation (... |
 | `send_whatsapp_message` | **yes** · reaches outside | Send a WhatsApp message to a phone number or BSUID; the conversation is created or reused. |
@@ -569,7 +574,7 @@ Messaging, e-signature requests, provisional bookings, handoffs and post-meeting
 
 Meeting-type templates, queues, group booking links, users and calendar connections.
 
-| Tool | Writes? | What it does |
+| Tool | Writes? | Purpose |
 |---|---|---|
 | `list_meeting_type_templates` |  | Without templateId: all templates. |
 | `save_meeting_type_template` | **destructive** · reaches outside | Create a template (no templateId; needs name, description, duration, channel) or change one (with templateId; only sent fields change). |
@@ -591,7 +596,7 @@ Meeting-type templates, queues, group booking links, users and calendar connecti
 
 Offers, invoices, credit notes, payments and dunning. Sending, finalizing and cancelling cannot be undone: always confirm the exact document first.
 
-| Tool | Writes? | What it does |
+| Tool | Writes? | Purpose |
 |---|---|---|
 | `list_sales_documents` |  | List invoicing documents (offers, order confirmations, invoices, credit notes, cancellations), filterable by kind, status and free-text search. |
 | `get_sales_document` |  | Fetch one document with its lines and totals (view=document, default), or a related read: events (history), payments, credit_summary (credited vs outstanding), payment_link (hosted pay-page URL, fi... |
@@ -622,6 +627,13 @@ boilerplate in a docstring and hoping, the tools supply it:
   the schema does not name goes through `advanced`.
 - **`list_appointments`** supplies the required `page` and `pageSize`, which the
   API has no defaults for.
+- **`get_todays_appointments`** sends the `timezone` the API requires, taking
+  it from the machine when the model gives none.
+- **`create_data_field`** fills the required-but-irrelevant `target`, `default`,
+  `required` and `hidden` when they are not given.
+- **Sending, finalizing and cancelling tools** (invoicing, WhatsApp, e-signature,
+  published Spaces) are annotated as reaching outside meetergo or as
+  destructive, and their descriptions tell the agent to confirm with you first.
 
 ## Development
 
