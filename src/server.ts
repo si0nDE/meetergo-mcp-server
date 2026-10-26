@@ -7,7 +7,7 @@
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { z } from 'zod'
+import { z } from 'zod/v3'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import { MeetergoApiError, type MeetergoClient } from './client.js'
 import { PROMPTS } from './prompts.js'

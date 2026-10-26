@@ -8,7 +8,7 @@
  * hence `root: true`. `userId` is an optional query on most of them: it lets an
  * admin act for a team member, and defaults to the caller.
  */
-import { z } from 'zod'
+import { z } from 'zod/v3'
 import { any, bool, list, numOrStr, out, str } from './output-helpers.js'
 import { definedOnly, iso } from './tool-helpers.js'
 import type { ToolDefinition } from './tools.js'

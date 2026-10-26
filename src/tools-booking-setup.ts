@@ -13,7 +13,7 @@
  * the partial form, so this sends only what the caller set, like
  * create_meeting_type does. Confirm the template create route live.
  */
-import { z } from 'zod'
+import { z } from 'zod/v3'
 import type { ToolDefinition } from './tools.js'
 import { definedOnly, listLimit, listOffset } from './tool-helpers.js'
 import { any, bool, list, num, out, record, str } from './output-helpers.js'

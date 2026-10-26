@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from 'zod/v3'
 import type { MeetergoClient, RequestOptions } from '../client.js'
 import { DOCS_OUTPUTS, DOCS_TOOLS } from '../tools-docs.js'
 

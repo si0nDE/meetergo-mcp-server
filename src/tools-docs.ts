@@ -6,7 +6,7 @@
  * customer-related content, so every write says what it overwrites and the
  * delete says to confirm first.
  */
-import { z } from 'zod'
+import { z } from 'zod/v3'
 import type { ToolDefinition } from './tools.js'
 import { definedOnly } from './tool-helpers.js'
 import { bool, list, num, out, record, str, any } from './output-helpers.js'

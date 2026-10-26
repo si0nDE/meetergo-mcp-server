@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from 'zod/v3'
 import { any, bool, list, num, out, str } from './output-helpers.js'
 import { definedOnly, iso, listLimit } from './tool-helpers.js'
 import type { ToolDefinition } from './tools.js'

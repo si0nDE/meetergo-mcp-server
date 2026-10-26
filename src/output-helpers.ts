@@ -6,7 +6,7 @@
  * The rules (everything the API owns is optional and nullable, schemas are
  * `.passthrough()`) are explained at the top of tool-outputs.ts.
  */
-import { z } from 'zod'
+import { z } from 'zod/v3'
 
 export const str = z.string().nullable().optional()
 export const bool = z.boolean().nullable().optional()

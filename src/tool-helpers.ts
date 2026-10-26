@@ -3,7 +3,7 @@
  * (tools-docs.ts, tools-invoicing.ts, ...). Lives in its own file so those
  * modules can use them without importing tools.ts, which imports them.
  */
-import { z } from 'zod'
+import { z } from 'zod/v3'
 
 export const iso = z.string().describe('ISO 8601 timestamp, e.g. 2026-08-04T09:00:00Z')
 

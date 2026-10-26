@@ -24,7 +24,7 @@
  * server wraps those. The text content keeps the raw shape — this affects only
  * the structured mirror.
  */
-import { z } from 'zod'
+import { z } from 'zod/v3'
 import { any, bool, list, num, numOrStr, out, record, str } from './output-helpers.js'
 import { DOCS_OUTPUTS } from './tools-docs.js'
 import { AVAILABILITY_OUTPUTS } from './tools-availability.js'

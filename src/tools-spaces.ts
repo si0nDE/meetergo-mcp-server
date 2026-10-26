@@ -11,7 +11,7 @@
  * no response body, and the client only parses JSON, so a binary or redirect
  * response would fail.
  */
-import { z } from 'zod'
+import { z } from 'zod/v3'
 import { any, bool, list, num, out, str } from './output-helpers.js'
 import { definedOnly } from './tool-helpers.js'
 import type { ToolDefinition } from './tools.js'
