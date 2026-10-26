@@ -25,21 +25,13 @@
  * the structured mirror.
  */
 import { z } from 'zod'
-
-const str = z.string().nullable().optional()
-const bool = z.boolean().nullable().optional()
-const num = z.number().nullable().optional()
-// Data-field ids are numeric on this API, unlike every uuid string id
-// elsewhere — confirmed live after create_data_field/update_data_field's
-// structuredContent validation rejected the real numeric id as a string.
-const numOrStr = z.union([z.string(), z.number()]).nullable().optional()
-const any = (description: string) => z.unknown().optional().describe(description)
-const record = z.object({}).passthrough()
-const list = <T extends z.ZodTypeAny>(item: T) => z.array(item).nullable().optional()
-
-function out(shape: z.ZodRawShape, description: string) {
-  return z.object(shape).passthrough().describe(description)
-}
+import { any, bool, list, num, numOrStr, out, record, str } from './output-helpers.js'
+import { DOCS_OUTPUTS } from './tools-docs.js'
+import { AVAILABILITY_OUTPUTS } from './tools-availability.js'
+import { SPACES_OUTPUTS } from './tools-spaces.js'
+import { ENGAGEMENT_OUTPUTS } from './tools-engagement.js'
+import { BOOKING_SETUP_OUTPUTS } from './tools-booking-setup.js'
+import { INVOICING_OUTPUTS } from './tools-invoicing.js'
 
 const ok = out(
   {
@@ -150,6 +142,31 @@ const duplicateContactGroup = out(
     contacts: list(contactSummary),
   },
   'Contacts that share a normalized email, phone or name',
+)
+
+const quietDeal = out(
+  {
+    dealId: str,
+    dealName: str,
+    value: num,
+    currency: str,
+    pipelineId: str,
+    stageId: str,
+    enteredStageAt: str,
+    isRotting: bool,
+    daysSinceLastActivity: num,
+    healthBand: str,
+    followUpsSinceLastReply: num,
+    contactId: str,
+    contactFirstName: str,
+    contactLastName: str,
+    contactEmail: str,
+    crmCompanyId: str,
+    contactSourceType: numOrStr.describe(
+      'Read from the contact additionalData key named by contactSourceField; null until that custom data field exists on the account',
+    ),
+  },
+  'An open deal that has gone quiet, with its server-computed health signal',
 )
 
 const pipelineStage = out(
@@ -666,6 +683,15 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
   ),
   create_contact: contact,
   update_contact: contact,
+  set_contact_source_type: out(
+    {
+      contactId: str,
+      contactSourceField: str,
+      value: str,
+      fieldCreated: bool.describe('true when the backing custom data field had to be created on this call'),
+    },
+    'Result of tagging a contact with an account-defined source-type flag, provisioning the backing field if needed',
+  ),
   list_calendar_connections: listOf(
     out(
       { id: str, provider: str.describe('google, microsoft, caldav …'), email: str },
@@ -828,6 +854,13 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
     { count: num, limit: num.describe('-1 means unlimited on the current plan') },
     "The account's deal count against its plan limit",
   ),
+  get_quiet_contacts: out(
+    {
+      totalOpenDealsScanned: num,
+      quietDeals: list(quietDeal),
+    },
+    'Open deals gone quiet, ranked by value, computed client-side',
+  ),
   find_duplicate_deals: listOf(record, 'Deals that look like duplicates, each with a match score'),
   get_deal_contact_suggestions: listOf(record, 'Contacts this deal is probably about'),
   merge_deals: out(
@@ -943,6 +976,21 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
   complete_task: task,
   uncomplete_task: task,
   delete_task: ok,
+  log_personal_followup: out(
+    {
+      note: record.nullable().optional(),
+      task: record.nullable().optional(),
+      content: str.describe('The formatted note content actually logged'),
+      followUpDueDate: str,
+      taskCreated: bool.describe('false when the note was logged but the linked reminder task then failed'),
+      taskError: str.describe('Present only when taskCreated is false'),
+      suggestedTask: record
+        .nullable()
+        .optional()
+        .describe('Present only when taskCreated is false — pass this to the task-creation tool to complete the reminder'),
+    },
+    'A logged personal follow-up conversation, plus its linked reminder task',
+  ),
   list_webhooks: listOf(webhook, 'Webhook subscriptions of the company'),
   create_webhook: webhook,
   update_webhook: webhook,
@@ -1076,6 +1124,12 @@ export const TOOL_OUTPUTS: Record<string, z.ZodObject<z.ZodRawShape>> = {
     },
     'Whether the page serves this account’s widget',
   ),
+  ...DOCS_OUTPUTS,
+  ...AVAILABILITY_OUTPUTS,
+  ...SPACES_OUTPUTS,
+  ...ENGAGEMENT_OUTPUTS,
+  ...BOOKING_SETUP_OUTPUTS,
+  ...INVOICING_OUTPUTS,
 }
 
 /**

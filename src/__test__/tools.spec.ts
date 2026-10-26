@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { MeetergoClient, RequestOptions } from '../client.js'
 import { TOOLS, sanitizeMiraSettingsForPatch } from '../tools.js'
 
@@ -8,7 +9,7 @@ import { TOOLS, sanitizeMiraSettingsForPatch } from '../tools.js'
  */
 describe('meetergo MCP tool surface', () => {
   it('covers the API surface an agent needs, with no duplicate names', () => {
-    expect(TOOLS).toHaveLength(129)
+    expect(TOOLS).toHaveLength(194)
     expect(new Set(TOOLS.map((t) => t.name)).size).toBe(TOOLS.length)
   })
 
@@ -54,11 +55,14 @@ describe('meetergo MCP tool surface', () => {
       'add_guest',
       'add_pipeline_stage',
       'answer_visitor_question',
+      'assign_meeting_type_template',
+      'availability_schedule_action',
       'book_appointment',
       'bulk_create_contacts',
       'bulk_delete_contacts',
       'bulk_import_deals',
       'cancel_appointment',
+      'change_sales_document_status',
       'complete_task',
       'crawl_company_website',
       'create_communication',
@@ -66,6 +70,7 @@ describe('meetergo MCP tool surface', () => {
       'create_contact',
       'create_data_field',
       'create_deal',
+      'create_document',
       'create_meeting_type',
       'create_note',
       'create_one_time_booking_link',
@@ -74,20 +79,41 @@ describe('meetergo MCP tool surface', () => {
       'create_routing_form',
       'create_task',
       'create_webhook',
+      'delete_attachment',
+      'delete_availability_exception',
+      'delete_availability_schedule',
       'delete_communication',
       'delete_company',
       'delete_contact',
       'delete_data_field',
       'delete_deal',
+      'delete_document',
+      'delete_group_booking_link',
       'delete_knowledge_document',
       'delete_meeting_type',
+      'delete_meeting_type_template',
       'delete_note',
       'delete_pipeline',
       'delete_pipeline_stage',
       'delete_routing_form',
+      'delete_sales_document_draft',
+      'delete_space',
       'delete_task',
       'delete_webhook',
+      'disconnect_calendar_connection',
+      'draft_follow_up_email',
+      'edit_space_structure',
+      'email_meeting_transcript',
+      'handoff_appointments',
       'import_booking_page',
+      'log_personal_followup',
+      'manage_document_payment',
+      'manage_queue_user_group',
+      'manage_sales_document',
+      'manage_signature',
+      'manage_space_link',
+      'manage_space_people',
+      'manage_space_section_template',
       'mark_deal_lost',
       'mark_deal_won',
       'merge_deals',
@@ -96,15 +122,28 @@ describe('meetergo MCP tool surface', () => {
       'reorder_data_fields',
       'reorder_pipeline_stages',
       'reschedule_appointment',
+      'resolve_provisional_booking',
       'restore_mira_settings',
-      // Not a data mutation an operator would name, but it persists the
-      // checklist's test-drive verdict and spends real model budget — a host
-      // that confirms expensive calls with the human must get the chance.
       'run_test_drive',
+      'save_availability_exception',
+      'save_availability_schedule',
+      'save_group_booking_link',
+      'save_meeting_type_template',
+      'save_sales_document_draft',
+      'save_space',
       'send_quick_email',
       'send_routing_form',
+      'send_sales_document',
+      'send_whatsapp_message',
+      'set_calendar_sync',
+      'set_contact_source_type',
+      'set_recap_sharing',
+      'space_action',
       'uncomplete_task',
       'update_appointment_notes',
+      'update_attachment',
+      'update_attendee',
+      'update_calendar_connection',
       'update_communication',
       'update_company',
       'update_contact',
@@ -112,6 +151,8 @@ describe('meetergo MCP tool surface', () => {
       'update_data_field',
       'update_deal',
       'update_deal_contact',
+      'update_document',
+      'update_invoicing_config',
       'update_lost_reasons',
       'update_meeting_transcription',
       'update_meeting_type',
@@ -120,6 +161,7 @@ describe('meetergo MCP tool surface', () => {
       'update_personal_page',
       'update_pipeline',
       'update_pipeline_stage',
+      'update_queue',
       'update_routing_form',
       'update_task',
       'update_webhook',
@@ -135,36 +177,61 @@ describe('meetergo MCP tool surface', () => {
     expect(destructive).toEqual([
       'add_guest',
       'answer_visitor_question',
+      'assign_meeting_type_template',
       'book_appointment',
       'bulk_delete_contacts',
       'cancel_appointment',
+      'change_sales_document_status',
+      'delete_attachment',
+      'delete_availability_exception',
+      'delete_availability_schedule',
       'delete_communication',
       'delete_company',
       'delete_contact',
       'delete_data_field',
       'delete_deal',
+      'delete_document',
+      'delete_group_booking_link',
       'delete_knowledge_document',
       'delete_meeting_type',
+      'delete_meeting_type_template',
       'delete_note',
       'delete_pipeline',
       'delete_pipeline_stage',
       'delete_routing_form',
+      'delete_sales_document_draft',
+      'delete_space',
       'delete_task',
       'delete_webhook',
+      'disconnect_calendar_connection',
+      'edit_space_structure',
+      'handoff_appointments',
+      'manage_document_payment',
+      'manage_queue_user_group',
+      'manage_signature',
+      'manage_space_link',
+      'manage_space_people',
+      'manage_space_section_template',
       'merge_deals',
       'remove_deal_contact',
       'reschedule_appointment',
+      'resolve_provisional_booking',
       'restore_mira_settings',
+      'save_meeting_type_template',
       'send_quick_email',
       'send_routing_form',
+      'send_sales_document',
+      'set_calendar_sync',
       'update_appointment_notes',
       'update_contact',
       'update_custom_field_definitions',
+      'update_invoicing_config',
       'update_lost_reasons',
       'update_meeting_transcription',
       'update_meeting_type',
       'update_mira_settings',
       'update_personal_page',
+      'update_queue',
       'update_routing_form',
       'update_webhook',
     ])
@@ -299,6 +366,18 @@ describe('meetergo MCP tool surface', () => {
       'stageId',
       'fieldId',
       'fieldIds',
+      // Per-area modules name their target after the thing they change.
+      'attachmentId',
+      'scheduleId',
+      'exceptionId',
+      'spaceId',
+      'templateId',
+      'groupBookingLinkId',
+      'connectionId',
+      'queueId',
+      'groupId',
+      'userId',
+      'id',
     ]
     // Company-scoped singletons: there is exactly one target (the caller's own
     // page / the company's Mira config / its knowledge base), so no id exists.
@@ -317,6 +396,9 @@ describe('meetergo MCP tool surface', () => {
       // field definitions / all lost-deal reasons), not a specific record.
       'update_custom_field_definitions',
       'update_lost_reasons',
+      // Pure sends: they create a message to a recipient, no existing record.
+      'send_whatsapp_message',
+      'email_meeting_transcript',
     ])
 
     for (const tool of TOOLS.filter(
@@ -1067,6 +1149,167 @@ describe('wire format', () => {
     expect(reopened.options.body).toBeUndefined()
   })
 
+  it('log_personal_followup logs a labeled note and a linked follow-up task', async () => {
+    const tool = TOOLS.find((t) => t.name === 'log_personal_followup')!
+    const { client, calls } = record({
+      '/crm/notes': { id: 'note-1' },
+      '/crm/tasks': { id: 'task-1' },
+    })
+
+    const result = (await tool.run(client, {
+      contactId: 'c-1',
+      contactName: 'Ada Lovelace',
+      need: 'Sucht einen Dienstleister für Y',
+      context: 'Getroffen auf der Konferenz X',
+      commitment: 'Melde mich mit einem Angebot',
+      commitmentDueDate: '2026-10-01',
+    })) as { note: unknown; task: unknown; content: string; followUpDueDate: string }
+
+    expect(calls).toHaveLength(2)
+    const [noteCall, taskCall] = calls
+    expect(noteCall).toMatchObject({ method: 'POST', path: '/crm/notes' })
+    expect(noteCall.options.root).toBe(true)
+    expect(noteCall.options.body).toMatchObject({
+      contactId: 'c-1',
+      content:
+        'Anliegen: Sucht einen Dienstleister für Y\nKontext: Getroffen auf der Konferenz X\nZusage: Melde mich mit einem Angebot (bis 2026-10-01)',
+    })
+
+    expect(taskCall).toMatchObject({ method: 'POST', path: '/crm/tasks' })
+    expect(taskCall.options.root).toBe(true)
+    expect(taskCall.options.body).toMatchObject({
+      title: 'Persönlich nachfassen: Ada Lovelace',
+      type: 'follow_up',
+      contactId: 'c-1',
+      description: noteCall.options.body.content,
+    })
+
+    // Defaulted to ~30 days out when no followUpDueDate was given.
+    const dueInDays =
+      (new Date(result.followUpDueDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+    expect(dueInDays).toBeGreaterThan(29)
+    expect(dueInDays).toBeLessThan(31)
+    expect((taskCall.options.body as { dueDate: string }).dueDate).toBe(result.followUpDueDate)
+    expect((result as unknown as { taskCreated: boolean }).taskCreated).toBe(true)
+  })
+
+  it('log_personal_followup keeps the logged note and reports the failure when the linked task write fails', async () => {
+    const tool = TOOLS.find((t) => t.name === 'log_personal_followup')!
+    const client = {
+      nextUrl: 'https://next.test',
+      request: (method: string, path: string) => {
+        if (path === '/crm/notes') return Promise.resolve({ id: 'note-1' })
+        if (path === '/crm/tasks') return Promise.reject(new Error('rate limited'))
+        throw new Error(`unexpected call: ${method} ${path}`)
+      },
+    } as unknown as MeetergoClient
+
+    const result = (await tool.run(client, {
+      contactId: 'c-1',
+      contactName: 'Ada Lovelace',
+      need: 'Braucht Angebot',
+      commitment: 'Melde mich',
+      followUpDueDate: '2027-01-01T00:00:00.000Z',
+    })) as {
+      note: unknown
+      task: unknown
+      taskCreated: boolean
+      taskError: string
+      suggestedTask: Record<string, unknown>
+    }
+
+    // Must not throw — a thrown error here would hide that the note already
+    // went through, and a naive retry would log the conversation twice.
+    expect(result.taskCreated).toBe(false)
+    expect(result.task).toBeNull()
+    expect(result.note).toMatchObject({ id: 'note-1' })
+    expect(result.taskError).toContain('rate limited')
+
+    // The failed write's own payload comes back so the caller can create it
+    // with no reconstruction — a bare flag is too easy to leave unactioned.
+    expect(result.suggestedTask).toMatchObject({
+      title: 'Persönlich nachfassen: Ada Lovelace',
+      type: 'follow_up',
+      dueDate: '2027-01-01T00:00:00.000Z',
+      contactId: 'c-1',
+    })
+  })
+
+  it('log_personal_followup omits the context line when none is given, and honours an explicit followUpDueDate', async () => {
+    const tool = TOOLS.find((t) => t.name === 'log_personal_followup')!
+    const { client, calls } = record({ '/crm/notes': {}, '/crm/tasks': {} })
+
+    await tool.run(client, {
+      contactId: 'c-2',
+      need: 'Braucht Info zu Z',
+      commitment: 'Melde mich morgen',
+      followUpDueDate: '2027-01-01T00:00:00.000Z',
+    })
+
+    expect(calls[0].options.body).toMatchObject({
+      content: 'Anliegen: Braucht Info zu Z\nZusage: Melde mich morgen',
+    })
+    expect(calls[1].options.body).toMatchObject({
+      title: 'Persönlich nachfassen: c-2',
+      dueDate: '2027-01-01T00:00:00.000Z',
+    })
+  })
+
+  it('set_contact_source_type reuses an existing field without creating a duplicate', async () => {
+    const tool = TOOLS.find((t) => t.name === 'set_contact_source_type')!
+    const { client, calls } = record({
+      '/data-field': [{ id: 1, name: 'contactSourceType', label: 'Kontaktart' }],
+      '/crm/c-1': { id: 'c-1' },
+    })
+
+    const result = (await tool.run(client, {
+      contactId: 'c-1',
+      value: 'network_contact',
+    })) as { fieldCreated: boolean; contactSourceField: string; value: string }
+
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/data-field')).toBe(false)
+    const patch = calls.find((c) => c.method === 'PATCH' && c.path === '/crm/c-1')!
+    expect(patch.options.root).toBe(true)
+    expect(patch.options.body).toMatchObject({ additionalData: { contactSourceType: 'network_contact' } })
+    expect(result).toMatchObject({
+      fieldCreated: false,
+      contactSourceField: 'contactSourceType',
+      value: 'network_contact',
+    })
+  })
+
+  it('set_contact_source_type creates the backing field on first use, and honours a custom field key', async () => {
+    const tool = TOOLS.find((t) => t.name === 'set_contact_source_type')!
+    const { client, calls } = record({
+      '/data-field': { data: [{ id: 1, name: 'someOtherField' }] },
+      '/crm/c-1': { id: 'c-1' },
+    })
+
+    const result = (await tool.run(client, {
+      contactId: 'c-1',
+      value: 'network_contact',
+      contactSourceField: 'kontaktart',
+      fieldLabel: 'Kontaktart',
+    })) as { fieldCreated: boolean }
+
+    const created = calls.find((c) => c.method === 'POST' && c.path === '/data-field')!
+    expect(created).toBeTruthy()
+    expect(created.options.root).toBeFalsy()
+    expect(created.options.body).toMatchObject({
+      label: 'Kontaktart',
+      fieldType: 'select',
+      name: 'kontaktart',
+      options: [
+        { label: 'network_contact', value: 'network_contact' },
+        { label: 'standard_customer', value: 'standard_customer' },
+        { label: 'cold_outreach', value: 'cold_outreach' },
+      ],
+    })
+    const patch = calls.find((c) => c.method === 'PATCH' && c.path === '/crm/c-1')!
+    expect(patch.options.body).toMatchObject({ additionalData: { kontaktart: 'network_contact' } })
+    expect(result.fieldCreated).toBe(true)
+  })
+
   it('reads custom field definitions, defaulting recordType to the API default', async () => {
     const call = await callTool('get_custom_field_definitions', { recordType: 'company' })
     expect(call).toMatchObject({ method: 'GET', path: '/crm/settings/custom-fields' })
@@ -1205,6 +1448,130 @@ describe('wire format', () => {
     for (const group of result.duplicateGroups) {
       expect(group.contacts.some((c) => c.contactId === 'c-6')).toBe(false)
     }
+  })
+
+  it('get_quiet_contacts filters by isRotting/silence, ranks by value, and surfaces contactSourceType', async () => {
+    const tool = TOOLS.find((t) => t.name === 'get_quiet_contacts')!
+    const dealBase = (overrides: Record<string, unknown>) => ({
+      id: 'placeholder',
+      name: 'placeholder',
+      value: 0,
+      pipelineId: 'p-1',
+      stageId: 's-1',
+      isRotting: false,
+      signal: {},
+      contact: {},
+      ...overrides,
+    })
+    const deals = [
+      // Quiet via isRotting, no signal.daysSinceLastActivity at all.
+      dealBase({
+        id: 'd-rotting',
+        name: 'Rotting deal',
+        value: 500,
+        isRotting: true,
+        contact: { id: 'c-1', firstName: 'Ada', additionalData: { contactSourceType: 'network_contact' } },
+      }),
+      // Quiet via the days threshold, higher value — should rank first.
+      dealBase({
+        id: 'd-quiet-high-value',
+        name: 'Quiet, high value',
+        value: 5000,
+        signal: { daysSinceLastActivity: 30, healthBand: 'at_risk', followUpsSinceLastReply: 3 },
+        contact: { id: 'c-2', firstName: 'Bob', additionalData: { contactSourceType: 'standard_customer' } },
+      }),
+      // Not quiet: below the default 14-day threshold and not rotting.
+      dealBase({
+        id: 'd-fresh',
+        name: 'Fresh deal',
+        value: 9999,
+        signal: { daysSinceLastActivity: 2 },
+      }),
+    ]
+    const { client, calls } = record({ '/crm/deals': { deals } })
+
+    const result = (await tool.run(client, {})) as {
+      totalOpenDealsScanned: number
+      quietDeals: Array<Record<string, unknown>>
+    }
+
+    expect(calls[0]).toMatchObject({ method: 'GET', path: '/crm/deals' })
+    expect(calls[0].options.query).toMatchObject({ page: 1, isOpen: true })
+    expect(result.totalOpenDealsScanned).toBe(3)
+    expect(result.quietDeals.map((d) => d.dealId)).toEqual(['d-quiet-high-value', 'd-rotting'])
+
+    const highValue = result.quietDeals[0]
+    expect(highValue).toMatchObject({
+      value: 5000,
+      healthBand: 'at_risk',
+      followUpsSinceLastReply: 3,
+      contactSourceType: 'standard_customer',
+    })
+    expect(highValue).not.toHaveProperty('_quiet')
+  })
+
+  it('get_quiet_contacts filters by contactSourceType and honours a custom contactSourceField', async () => {
+    const tool = TOOLS.find((t) => t.name === 'get_quiet_contacts')!
+    const deals = [
+      {
+        id: 'd-network',
+        value: 100,
+        isRotting: true,
+        signal: {},
+        contact: { id: 'c-1', additionalData: { kontaktart: 'network_contact' } },
+      },
+      {
+        id: 'd-standard',
+        value: 200,
+        isRotting: true,
+        signal: {},
+        contact: { id: 'c-2', additionalData: { kontaktart: 'standard_customer' } },
+      },
+    ]
+    const { client } = record({ '/crm/deals': { deals } })
+
+    const result = (await tool.run(client, {
+      contactSourceField: 'kontaktart',
+      contactSourceType: 'network_contact',
+    })) as { quietDeals: Array<Record<string, unknown>> }
+
+    expect(result.quietDeals.map((d) => d.dealId)).toEqual(['d-network'])
+    expect(result.quietDeals[0].contactSourceType).toBe('network_contact')
+  })
+
+  it('get_quiet_contacts pages through every open deal and forwards pipelineId/ownerId', async () => {
+    const tool = TOOLS.find((t) => t.name === 'get_quiet_contacts')!
+    const fullPage = Array.from({ length: 200 }, (_, i) => ({
+      id: `d-${i}`,
+      value: 1,
+      isRotting: false,
+      signal: { daysSinceLastActivity: 0 },
+      contact: {},
+    }))
+    const secondPage = [{ id: 'd-last', value: 1, isRotting: true, signal: {}, contact: {} }]
+    const pages = [fullPage, secondPage]
+    const calls: RecordedCall[] = []
+    let call = 0
+    const client = {
+      nextUrl: 'https://next.test',
+      request: (method: string, path: string, options: RequestOptions = {}) => {
+        calls.push({ method, path, options })
+        const page = pages[call]
+        call += 1
+        return Promise.resolve({ deals: page })
+      },
+    } as unknown as MeetergoClient
+
+    const result = (await tool.run(client, { pipelineId: 'p-1', ownerId: 'u-1' })) as {
+      totalOpenDealsScanned: number
+      quietDeals: Array<Record<string, unknown>>
+    }
+
+    expect(calls).toHaveLength(2)
+    expect(calls[0].options.query).toMatchObject({ page: 1, limit: 200, pipelineId: 'p-1', ownerId: 'u-1' })
+    expect(calls[1].options.query).toMatchObject({ page: 2, limit: 200 })
+    expect(result.totalOpenDealsScanned).toBe(201)
+    expect(result.quietDeals.map((d) => d.dealId)).toEqual(['d-last'])
   })
 
   it('strips embedded deal objects from list_deals by default', async () => {
@@ -1705,6 +2072,7 @@ describe('open-world annotations', () => {
     expect(openWorld).toEqual([
       'add_guest',
       'answer_visitor_question',
+      'assign_meeting_type_template',
       'book_appointment',
       'cancel_appointment',
       'crawl_company_website',
@@ -1713,15 +2081,30 @@ describe('open-world annotations', () => {
       'create_qualification_form',
       'create_routing_form',
       'create_webhook',
+      'delete_group_booking_link',
       'delete_knowledge_document',
       'delete_meeting_type',
+      'delete_meeting_type_template',
       'delete_routing_form',
       'delete_webhook',
+      'email_meeting_transcript',
+      'handoff_appointments',
       'import_booking_page',
+      'manage_signature',
+      'manage_space_link',
+      'manage_space_people',
       'reschedule_appointment',
+      'resolve_provisional_booking',
       'restore_mira_settings',
+      'save_group_booking_link',
+      'save_meeting_type_template',
       'send_quick_email',
       'send_routing_form',
+      'send_sales_document',
+      'send_whatsapp_message',
+      'set_recap_sharing',
+      'space_action',
+      'update_invoicing_config',
       'update_meeting_type',
       'update_mira_settings',
       'update_personal_page',
@@ -2002,5 +2385,249 @@ describe('agent-readable scheduling results', () => {
     await expect(
       toolByName('get_appointment').run(client, { appointmentId: 'appt-1' }),
     ).resolves.toEqual(['unexpected', 'array'])
+  })
+})
+
+describe('CRM fields added from the v2 spec', () => {
+  const schemaOf = (name: string) => z.object(TOOLS.find((t) => t.name === name)!.schema)
+
+  it('sends birthday on create and update, null clearing it', async () => {
+    const created = await callTool('create_contact', { email: 'a@b.de', birthday: '1980-10-07' })
+    expect(created).toMatchObject({ method: 'POST', path: '/crm' })
+    expect(created.options.body).toMatchObject({ birthday: '1980-10-07' })
+
+    const cleared = await callTool('update_contact', { contactId: 'c-1', birthday: null })
+    expect(cleared).toMatchObject({ method: 'PATCH', path: '/crm/c-1' })
+    expect(cleared.options.body).toEqual({ birthday: null })
+  })
+
+  it('sends winProbability on update_deal, null returning it to the stage value', async () => {
+    const set = await callTool('update_deal', { dealId: 'd-1', winProbability: 60 })
+    expect(set).toMatchObject({ method: 'PATCH', path: '/crm/deals/d-1' })
+    expect(set.options.body).toEqual({ winProbability: 60 })
+    const reset = await callTool('update_deal', { dealId: 'd-1', winProbability: null })
+    expect(reset.options.body).toEqual({ winProbability: null })
+    expect(schemaOf('update_deal').safeParse({ dealId: 'd-1', winProbability: 101 }).success).toBe(false)
+  })
+
+  it('sends assigneeIds and sourceRef on tasks, and enforces the sourceRef pattern', async () => {
+    const created = await callTool('create_task', {
+      title: 'T',
+      type: 'todo',
+      dueDate: '2026-10-01T09:00:00.000Z',
+      assigneeIds: ['u-1', 'u-2'],
+      sourceRef: 'notetaker:s1:i2',
+    })
+    expect(created.options.body).toMatchObject({ assigneeIds: ['u-1', 'u-2'], sourceRef: 'notetaker:s1:i2' })
+    const updated = await callTool('update_task', { taskId: 'task-1', assigneeIds: ['u-2'] })
+    expect(updated).toMatchObject({ method: 'PATCH', path: '/crm/tasks/task-1' })
+    expect(updated.options.body).toEqual({ assigneeIds: ['u-2'] })
+
+    const base = { title: 'T', type: 'todo', dueDate: '2026-10-01T09:00:00.000Z' }
+    expect(schemaOf('create_task').safeParse({ ...base, sourceRef: 'Bad Ref' }).success).toBe(false)
+    expect(schemaOf('create_task').safeParse({ ...base, sourceRef: 'a'.repeat(201) }).success).toBe(false)
+  })
+
+  it('sends isPinned on create_note and duration/externalId on create_communication', async () => {
+    const note = await callTool('create_note', { content: 'x', contactId: 'c-1', isPinned: true })
+    expect(note).toMatchObject({ method: 'POST', path: '/crm/notes' })
+    expect(note.options.body).toMatchObject({ isPinned: true })
+
+    const comm = await callTool('create_communication', {
+      type: 'call',
+      direction: 'outbound',
+      body: 'x',
+      occurredAt: '2026-10-01T09:00:00.000Z',
+      contactId: 'c-1',
+      durationSeconds: 90,
+      externalId: 'thread-1',
+    })
+    expect(comm.options.body).toMatchObject({ durationSeconds: 90, externalId: 'thread-1' })
+  })
+})
+
+describe('Non-CRM fields added from the v2 spec', () => {
+  const schemaOf = (name: string) => z.object(TOOLS.find((t) => t.name === name)!.schema)
+
+  it('sends the extra availability query params', async () => {
+    const call = await callTool('get_availability', {
+      meetingTypeId: 'mt-1',
+      start: '2026-10-01T00:00:00Z',
+      end: '2026-10-02T00:00:00Z',
+      calculationMethod: 'anyone',
+      channel: 'zoom',
+      attendeeEmail: 'a@b.de',
+      troubleshoot: true,
+    })
+    expect(call).toMatchObject({ method: 'GET', path: '/booking-availability' })
+    expect(call.options.query).toMatchObject({
+      calculationMethod: 'anyone',
+      channel: 'zoom',
+      attendeeEmail: 'a@b.de',
+      troubleshoot: true,
+    })
+    const base = { meetingTypeId: 'mt-1', start: 's', end: 'e' }
+    expect(schemaOf('get_availability').safeParse({ ...base, calculationMethod: 'some' }).success).toBe(false)
+  })
+
+  it('sends booking extras at the top level and language on the attendee', async () => {
+    const call = await callTool('book_appointment', {
+      meetingTypeId: 'mt-1',
+      start: '2026-10-01T09:00:00Z',
+      email: 'a@b.de',
+      fullName: 'Ada Lovelace',
+      language: 'de',
+      channel: 'hostDefault',
+      skipNotifications: true,
+      icsTitle: 'Kickoff',
+      couponCode: 'SAVE10',
+    })
+    expect(call).toMatchObject({ method: 'POST', path: '/booking' })
+    const body = call.options.body as { attendee: Record<string, unknown> }
+    expect(body).toMatchObject({ channel: 'hostDefault', skipNotifications: true, icsTitle: 'Kickoff', couponCode: 'SAVE10' })
+    expect(body.attendee).toMatchObject({ language: 'de', fullname: 'Ada Lovelace' })
+  })
+
+  it('allows a phone-only booking without email, but not a nameless or emailless one otherwise', async () => {
+    const call = await callTool('book_appointment', {
+      meetingTypeId: 'mt-1',
+      start: '2026-10-01T09:00:00Z',
+      phone: '+4915112345678',
+      fullName: 'Ada',
+      phoneOnlyBooking: true,
+    })
+    expect((call.options.body as Record<string, unknown>).phoneOnlyBooking).toBe(true)
+    const tool = TOOLS.find((t) => t.name === 'book_appointment')!
+    const { client } = record(SOLO_MEETING_TYPE)
+    await expect(
+      tool.run(client, { meetingTypeId: 'mt-1', start: 's', fullName: 'Ada' }),
+    ).rejects.toThrow(/email/)
+    const schema = schemaOf('book_appointment')
+    const ok = { meetingTypeId: 'mt-1', start: 's', email: 'a@b.de' }
+    expect(schema.safeParse({ ...ok, fullName: 'x'.repeat(151) }).success).toBe(false)
+    expect(schema.safeParse({ ...ok, icsDescription: 'x'.repeat(2001) }).success).toBe(false)
+    expect(schema.safeParse({ ...ok, couponCode: 'x'.repeat(33) }).success).toBe(false)
+  })
+
+  it('sends the required timezone query on today, and the new list filters', async () => {
+    const today = await callTool('get_todays_appointments', { timezone: 'Europe/Berlin' })
+    expect(today).toMatchObject({ method: 'GET', path: '/appointment/today' })
+    expect(today.options.query).toEqual({ timezone: 'Europe/Berlin' })
+    const fallback = await callTool('get_todays_appointments', {})
+    expect(typeof (fallback.options.query as { timezone: unknown }).timezone).toBe('string')
+
+    const list = await callTool('list_appointments', { all: true, userId: 'u-1', channel: 'phone', workspaceId: 'w-1' })
+    expect(list.options.query).toMatchObject({ all: true, userId: 'u-1', channel: 'phone', workspaceId: 'w-1', page: 0, pageSize: 20 })
+  })
+
+  it('sends transcription timestamps and bounds the content length', async () => {
+    const call = await callTool('update_meeting_transcription', {
+      appointmentId: 'a-1',
+      transcription: 'x',
+      actualStartAt: '2026-10-01T09:00:00Z',
+      actualEndAt: '2026-10-01T09:30:00Z',
+    })
+    expect(call).toMatchObject({ method: 'PATCH', path: '/appointment/a-1/transcription' })
+    expect(call.options.body).toEqual({
+      transcription: 'x',
+      actualStartAt: '2026-10-01T09:00:00Z',
+      actualEndAt: '2026-10-01T09:30:00Z',
+    })
+    const schema = schemaOf('update_meeting_transcription')
+    expect(schema.safeParse({ appointmentId: 'a', transcription: 'x'.repeat(500001) }).success).toBe(false)
+    expect(schema.safeParse({ appointmentId: 'a', summary: 'x'.repeat(100001) }).success).toBe(false)
+  })
+
+  it('passes userId to the calendar connections list', async () => {
+    const call = await callTool('list_calendar_connections', { userId: 'u-1' })
+    expect(call).toMatchObject({ method: 'GET', path: '/calendar-connections/connections' })
+    expect(call.options.query).toEqual({ userId: 'u-1' })
+  })
+
+  it('splits meeting-type settings into meetingInfo and top-level fields on create and update', async () => {
+    const created = await callTool('create_meeting_type', {
+      name: 'N',
+      description: '',
+      duration: 30,
+      channel: 'hostDefault',
+      contactTags: ['lead'],
+      internalNotes: 'note',
+      isGlobalQueue: true,
+    })
+    expect(created).toMatchObject({ method: 'POST', path: '/meeting-type' })
+    expect(created.options.body).toEqual({
+      meetingInfo: { name: 'N', description: '', duration: 30, channel: 'hostDefault' },
+      contactTags: ['lead'],
+      internalNotes: 'note',
+      isGlobalQueue: true,
+    })
+
+    const updated = await callTool('update_meeting_type', {
+      meetingTypeId: 'mt-1',
+      enabled: false,
+      timeslotInterval: 15,
+      bookingMinimum: 60,
+      groupBooking: true,
+      daysIntoFuture: { mode: 'limit', bookingLimit: 20160 },
+    })
+    expect(updated).toMatchObject({ method: 'PATCH', path: '/meeting-type/mt-1' })
+    expect(updated.options.body).toEqual({
+      meetingInfo: { groupBooking: true },
+      daysIntoFuture: { mode: 'limit', bookingLimit: 20160 },
+      enabled: false,
+      timeslotInterval: 15,
+      bookingMinimum: 60,
+    })
+    const schema = schemaOf('update_meeting_type')
+    expect(schema.safeParse({ meetingTypeId: 'm', timeslotInterval: 4 }).success).toBe(false)
+    expect(schema.safeParse({ meetingTypeId: 'm', timeslotInterval: 61 }).success).toBe(false)
+    expect(schema.safeParse({ meetingTypeId: 'm', bookingMinimum: 10081 }).success).toBe(false)
+    expect(schema.safeParse({ meetingTypeId: 'm', internalNotes: 'x'.repeat(5001) }).success).toBe(false)
+    expect(schema.safeParse({ meetingTypeId: 'm', contactTags: Array(11).fill('t') }).success).toBe(false)
+    expect(schema.safeParse({ meetingTypeId: 'm', channel: 'zava' }).success).toBe(true)
+  })
+
+  it('sends the new personal-page fields', async () => {
+    const call = await callTool('update_personal_page', {
+      showMeetingsSection: true,
+      showContactExchange: false,
+      theme: { preset: 'classic', buttonShape: 'pill' },
+    })
+    expect(call).toMatchObject({ method: 'PATCH', path: '/personal-page/me' })
+    expect(call.options.body).toEqual({
+      showMeetingsSection: true,
+      showContactExchange: false,
+      theme: { preset: 'classic', buttonShape: 'pill' },
+    })
+    expect(schemaOf('update_personal_page').safeParse({ theme: { font: 'comic' } }).success).toBe(false)
+  })
+
+  it('fills the data-field create defaults the API requires, and accepts the current enums', async () => {
+    const call = await callTool('create_data_field', { label: 'Firma', fieldType: 'text-single' })
+    expect(call).toMatchObject({ method: 'POST', path: '/data-field' })
+    expect(call.options.body).toEqual({
+      label: 'Firma',
+      fieldType: 'text-single',
+      target: 'other',
+      default: false,
+      required: false,
+      hidden: false,
+    })
+    const explicit = await callTool('create_data_field', {
+      label: 'Mail',
+      fieldType: 'email',
+      target: 'email',
+      required: true,
+      helpText: 'Work address',
+    })
+    expect(explicit.options.body).toMatchObject({ target: 'email', required: true, hidden: false, helpText: 'Work address' })
+
+    const create = schemaOf('create_data_field')
+    expect(create.safeParse({ label: 'x', fieldType: 'searchable-choice' }).success).toBe(true)
+    expect(create.safeParse({ label: 'x', fieldType: 'text' }).success).toBe(false)
+    expect(create.safeParse({ label: 'x', fieldType: 'email', target: 'company' }).success).toBe(false)
+
+    const updated = await callTool('update_data_field', { fieldId: 7, hidden: true, placeholder: 'p' })
+    expect(updated.options.body).toEqual({ hidden: true, placeholder: 'p' })
   })
 })

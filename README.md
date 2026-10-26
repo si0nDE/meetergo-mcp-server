@@ -10,7 +10,7 @@ change anything. Both are useful and they do different jobs:
 | | Docs MCP | This server |
 |---|---|---|
 | Endpoint | `developer.meetergo.com/mcp` | `mcp.meetergo.com/mcp`, or `npx` over stdio |
-| Tools | `SearchMeetergo` | 129 scheduling, CRM, Mira and config tools |
+| Tools | `SearchMeetergo` | 194 scheduling, CRM, Mira and config tools |
 | Can it book? | No | **Yes** |
 | Use it to | write an integration | be the integration |
 
@@ -203,7 +203,7 @@ server itself is never gated — a token from any plan, including Free, works.
 
 ## Tools
 
-129 tools, covering scheduling end to end. **Scheduling** is the loop most agents
+194 tools, covering scheduling end to end. **Scheduling** is the loop most agents
 live in; the rest is there so an agent never has to fall back to raw REST.
 
 ### Scheduling
@@ -274,6 +274,7 @@ live in; the rest is there so an agent never has to fall back to raw REST.
 | `get_contact` | | Full record, by `contactId` or by `attendeeId` from a booking |
 | `create_contact` | **yes** | Add a contact; also takes `address` and `additionalData` |
 | `update_contact` | **yes** | Edit a contact, including `language`, `address`, `additionalData` and the research-suggested `title`/`employer`/`seniority`/`function`/`location` |
+| `set_contact_source_type` | **yes** | Tag a contact with an account-defined source-type flag (e.g. network contact vs. standard customer); creates the backing data field itself on first use if none exists yet |
 | `bulk_create_contacts` | **yes** | Import many at once (3 calls per min) |
 | `delete_contact` | **destructive** | Remove a contact and its form answers |
 | `bulk_delete_contacts` | **destructive** | Delete up to 500 contacts in one call (3 calls per min) — the cleanup after a bad import or a round of test contacts |
@@ -315,6 +316,7 @@ view or remove them.
 | `get_deal_activity` | | Stage-change and update history, most recent first |
 | `get_deal_summary` | | Deal counts and value across the pipeline, by stage |
 | `get_deal_limits` | | Deal count against the plan limit (`-1` = unlimited) |
+| `get_quiet_contacts` | | Open deals gone quiet (rotting, or past a days-since-activity threshold), ranked by value — computed client-side from `list_deals`' own `signal`/`isRotting` fields, no dedicated endpoint |
 | `find_duplicate_deals` | | Deals that look like duplicates of a given deal, with a match score |
 | `get_deal_contact_suggestions` | | Contacts a deal is probably about, when none is linked yet |
 | `add_deal_contact` | **yes** | Link another contact to a deal with a role (decision_maker, influencer, user, primary, other) |
@@ -449,6 +451,7 @@ saves anything, so it's deliberately not wired up either.
 | `list_overdue_tasks` | | Open tasks past their due date |
 | `list_upcoming_tasks` | | Open tasks due soon |
 | `list_company_tasks` | | A company's tasks, on the confirmed `by-company` endpoint |
+| `log_personal_followup` | **yes** | Log a personal conversation as a fixed, labeled note (Anliegen/Kontext/Zusage) plus a linked reminder task, due in 30 days by default |
 
 `completed`, `status`, `isCompleted` and `completedAt` are silently ignored on
 `update_task` itself — HTTP 200, no effect. `complete_task`/`uncomplete_task`
@@ -497,6 +500,110 @@ answers from the company's own pages and books meetings.
 Writes carry `readOnlyHint: false`, and everything marked **destructive** above
 carries `destructiveHint: true`, so hosts can require confirmation before an
 agent removes something a human would miss.
+
+### meetergo Docs and attachments
+
+Pages and spreadsheets in meetergo Docs, optionally linked to a CRM contact, and edits to CRM attachments.
+
+| Tool | Writes? | What it does |
+|---|---|---|
+| `list_documents` |  | List pages and spreadsheets in meetergo Docs, compact rows without content (open a single document for that). |
+| `get_document` |  | Load one page or spreadsheet. |
+| `create_document` | **yes** | Create a page or spreadsheet in meetergo Docs. |
+| `update_document` | **yes** | Change a document; only supplied fields change. |
+| `delete_document` | **destructive** | Permanently delete a page or spreadsheet from meetergo Docs. |
+| `get_attachment_download_url` |  | Return a presigned url for a CRM attachment's file (attachment id from the attachment list). |
+| `update_attachment` | **yes** | Set the description/label of a CRM attachment. |
+| `delete_attachment` | **destructive** | Remove an attachment from a CRM company, deal or contact. |
+
+### Availability schedules
+
+Weekly working-hours schedules and their exceptions. Not the free-slot lookup `get_availability`.
+
+| Tool | Writes? | What it does |
+|---|---|---|
+| `get_availability_schedule` |  | Read weekly working-hours schedules (with their exceptions). |
+| `list_availability_exceptions` |  | List date-specific exceptions (holidays, blocked or extra hours): your own, or the company-wide ones that apply to everyone. |
+| `save_availability_schedule` | **yes** | Create a weekly schedule (no scheduleId; name and timezone required) or change one (scheduleId; only supplied fields change). |
+| `delete_availability_schedule` | **destructive** | Permanently delete a weekly schedule. |
+| `availability_schedule_action` | **yes** | set_default: make a schedule the default (yours, or userId's). |
+| `save_availability_exception` | **yes** | Block or open a specific date range. |
+| `delete_availability_exception` | **destructive** | Permanently delete a date exception. |
+
+### Spaces
+
+Client portals with sections, blocks, share links and invited people.
+
+| Tool | Writes? | What it does |
+|---|---|---|
+| `list_spaces` |  | List client portals (kind "spaces"), reusable space templates ("templates"), or saved section templates ("section_templates"). |
+| `get_space` |  | Read one space with its sections and blocks, or via part: its share links, form submissions (form_status), files visitors uploaded (uploads), or invited people. |
+| `save_space` | **yes** | Create a blank portal (name required), create one from a template or existing space (sourceSpaceId; copies sections and blocks and swaps in the client), or update one (spaceId; only supplied fields... |
+| `delete_space` | **destructive** | Delete a client portal, including its links. |
+| `space_action` | **yes** · reaches outside | publish: make the portal live (visible to clients once a link or invite exists; confirm with the user first). |
+| `edit_space_structure` | **destructive** | Change a space's layout. |
+| `manage_space_link` | **destructive** · reaches outside | Share links are how clients open a portal. |
+| `manage_space_people` | **destructive** · reaches outside | invite: give a person access to a portal (sendEmail also mails them the link; confirm the address and whether to email first). |
+| `manage_space_section_template` | **destructive** | create: a template from scratch (name + structure { title, blocks[] }). |
+
+### WhatsApp, signatures and meeting follow-up
+
+Messaging, e-signature requests, provisional bookings, handoffs and post-meeting actions.
+
+| Tool | Writes? | What it does |
+|---|---|---|
+| `get_whatsapp` |  | Read WhatsApp data, selected by `view`: senders (business numbers), templates (approved ones are needed outside the 24h window), conversations (newest first; filter by phone/status), conversation (... |
+| `send_whatsapp_message` | **yes** · reaches outside | Send a WhatsApp message to a phone number or BSUID; the conversation is created or reused. |
+| `get_signatures` |  | Read e-signature data, selected by `view`: usage (this month against the plan allowance; -1 = unlimited), list (newest first, 50 per page; pass the last id as `before`), get (status and signers of... |
+| `manage_signature` | **destructive** · reaches outside | Act on a signature request via `action`. |
+| `list_provisional_bookings` |  | List bookings that wait for confirmation: type requireHostConfirmation needs the host, doubleOptIn waits for the attendee. |
+| `resolve_provisional_booking` | **destructive** · reaches outside | decline: rejects a pending booking request and notifies the attendee, optionally with a reason. |
+| `list_handoff_options` |  | List the users an appointment (or a channel) can be handed off to, with a blocked reason where a user cannot take it. |
+| `handoff_appointments` | **destructive** · reaches outside | Change the host of appointments. |
+| `update_attendee` | **yes** | action no_show: marks an attendee as no-show for reporting. |
+| `draft_follow_up_email` | **yes** | Generates an editable follow-up subject and body from the appointment summary or transcript. |
+| `set_recap_sharing` | **yes** · reaches outside | shared true: publishes the meeting recap behind a public link. |
+| `email_meeting_transcript` | **yes** · reaches outside | Sends a meeting summary and/or transcript (markdown) as an email to one address. |
+
+### Booking setup
+
+Meeting-type templates, queues, group booking links, users and calendar connections.
+
+| Tool | Writes? | What it does |
+|---|---|---|
+| `list_meeting_type_templates` |  | Without templateId: all templates. |
+| `save_meeting_type_template` | **destructive** · reaches outside | Create a template (no templateId; needs name, description, duration, channel) or change one (with templateId; only sent fields change). |
+| `assign_meeting_type_template` | **destructive** · reaches outside | assign_host / assign_hosts (up to 100) give users a meeting type made from the template; assign_workspace does that for a team workspace; unassign removes the template assignment. |
+| `delete_meeting_type_template` | **destructive** · reaches outside | Delete a meeting type template. |
+| `list_queues` |  | No arguments: all queues of the company. |
+| `update_queue` | **destructive** | Change who hosts a round robin meeting type and how bookings are distributed. |
+| `manage_queue_user_group` | **destructive** | Create, update or delete a host group inside a queue. |
+| `list_booking_links` |  | Read booking links. |
+| `save_group_booking_link` | **yes** · reaches outside | Create a group booking link (no groupBookingLinkId; needs workspaceId, meetingTypeId, hostIds) or change one (with groupBookingLinkId; hostIds replaces the host list). |
+| `delete_group_booking_link` | **destructive** · reaches outside | Delete a group booking link. |
+| `list_users` |  | Company users with ids, names, email and type. |
+| `get_calendar_connection_options` |  | With connectionId: the calendars of that connection (ids for a calendar connection update). |
+| `update_calendar_connection` | **yes** | Change which calendars block availability, where new events are written and sync behaviour, or make the connection primary (setPrimary). |
+| `disconnect_calendar_connection` | **destructive** | Remove a calendar connection. |
+| `set_calendar_sync` | **destructive** | Choose which connected calendar receives bookings for a user, or clear it (clear: true), which stops writing bookings to any calendar. |
+
+### Invoicing
+
+Offers, invoices, credit notes, payments and dunning. Sending, finalizing and cancelling cannot be undone: always confirm the exact document first.
+
+| Tool | Writes? | What it does |
+|---|---|---|
+| `list_sales_documents` |  | List invoicing documents (offers, order confirmations, invoices, credit notes, cancellations), filterable by kind, status and free-text search. |
+| `get_sales_document` |  | Fetch one document with its lines and totals (view=document, default), or a related read: events (history), payments, credit_summary (credited vs outstanding), payment_link (hosted pay-page URL, fi... |
+| `get_invoicing_config` |  | Read invoicing setup: kind=settings (seller data, tax, dunning, DATEV), products (id optional for one), bank_accounts, number_ranges (numbering per document kind) or recurring (recurring invoices,... |
+| `get_invoice_buyer_prefill` |  | Buyer fields for a new document taken from a CRM company. |
+| `save_sales_document_draft` | **yes** | Create a draft (no documentId; buyer required, kind defaults to invoice) or edit an existing DRAFT (documentId; only the fields you send change, lines replaces the whole list). |
+| `delete_sales_document_draft` | **destructive** | Delete a DRAFT document (drafts only; finalized documents cannot be deleted, cancel it via the status tool). |
+| `manage_sales_document` | **yes** | Non-sending document actions: duplicate (copy as a new draft), convert_to_invoice (offer to invoice), create_credit_note (draft Gutschrift over all or selected lines of an invoice; reason required;... |
+| `send_sales_document` | **destructive** · reaches outside | Sends mail or WhatsApp to the customer: channel email (document, with pay link by default), whatsapp (needs phoneNumberId; the message links the hosted pay page) or dunning_reminder (reminder on th... |
+| `change_sales_document_status` | **destructive** | Irreversible status changes: finalize (draft becomes a legally binding document and consumes the next number; profile zugferd-en16931 default or xrechnung-cii), cancel (cancels a finalized document... |
+| `manage_document_payment` | **destructive** | Book a manual payment on a document (action record: amount, method bank_transfer/cash/other, optional paidAt and note) or remove one (action delete: paymentId from the payments view of the document). |
+| `update_invoicing_config` | **destructive** · reaches outside | Write invoicing setup. |
 
 ## What the tools do for you
 

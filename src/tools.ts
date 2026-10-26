@@ -2,6 +2,13 @@ import { z } from 'zod'
 import type { MeetergoClient } from './client.js'
 import { fetchPublicUrl } from './safe-fetch.js'
 import { presentSchedulingResult } from './scheduling-result.js'
+import { definedOnly, iso, listLimit, listOffset } from './tool-helpers.js'
+import { DOCS_TOOLS } from './tools-docs.js'
+import { AVAILABILITY_TOOLS } from './tools-availability.js'
+import { SPACES_TOOLS } from './tools-spaces.js'
+import { ENGAGEMENT_TOOLS } from './tools-engagement.js'
+import { BOOKING_SETUP_TOOLS } from './tools-booking-setup.js'
+import { INVOICING_TOOLS } from './tools-invoicing.js'
 import {
   analyzeInstallHtml,
   deriveSetupStatus,
@@ -72,8 +79,6 @@ export interface ToolDefinition {
   run: (client: MeetergoClient, args: Record<string, any>) => Promise<unknown>
 }
 
-const iso = z.string().describe('ISO 8601 timestamp, e.g. 2026-08-04T09:00:00Z')
-
 interface MeetingTypeScope {
   id: string
   userId?: string
@@ -101,6 +106,48 @@ const DATA_FIELD_TYPES = [
   'rating',
   'scale',
   'signature',
+  'image',
+  'heading',
+  'separator',
+  'page-break',
+  'contact',
+  'bank-details',
+  'license-plate',
+  'info-text',
+  'info-image',
+  'info-video',
+  'currency',
+  'location',
+  'pdf-template',
+  'signature-document',
+  'file-download',
+  'testimonial',
+  'faq',
+  'countdown',
+  'loading',
+  'quiz-reveal',
+  'logos',
+  'checklist',
+  'html',
+  'address',
+  'searchable-choice',
+] as const
+
+/** Which attendee field a data field's answer maps onto (`other` = custom). */
+const DATA_FIELD_TARGETS = [
+  'email',
+  'firstname',
+  'lastname',
+  'fullname',
+  'phone',
+  'marketing_consent',
+  'linkedin_profile',
+  'other',
+] as const
+
+/** Booking form language of the attendee. */
+const ATTENDEE_LANGUAGES = [
+  'en', 'de', 'fr', 'es', 'no', 'nl', 'it', 'pl', 'se', 'tr', 'da', 'pt', 'ru', 'uk',
 ] as const
 
 /** Every event the API will accept on a webhook subscription. */
@@ -127,6 +174,26 @@ const DEAL_CONTACT_ROLES = [
 
 /** What entering a pipeline stage records for the Sales Learning report. */
 const SALES_MILESTONES = ['start', 'demo', 'offer'] as const
+
+/** Optional data-field settings shared by create and update. */
+const dataFieldExtraShape = {
+  hidden: z.boolean().optional(),
+  placeholder: z.string().optional(),
+  helpText: z.string().optional().describe('Shown below the field in the booking form'),
+  defaultValue: z.string().nullable().optional(),
+  min: z.number().optional().describe('Number fields: minimum'),
+  max: z.number().optional().describe('Number fields: maximum'),
+  locales: z
+    .array(z.record(z.unknown()))
+    .optional()
+    .describe('Translations: [{ locale, label, placeholder? }]'),
+  fileFieldOptions: z
+    .record(z.unknown())
+    .optional()
+    .describe(
+      'Required for fieldType file: { allowedExtensions: string[], maxFileSizeMB, maxFiles, enableCameraCapture? }',
+    ),
+}
 
 const pipelineStageShape = {
   name: z.string().max(100),
@@ -195,22 +262,24 @@ const MEETING_CHANNELS = [
   'resource',
   'whereby',
   'kmeet',
+  'zava',
   'jitsi',
   'nextcloudTalk',
   'openTalk',
   'alfaview',
+  'hostDefault',
 ] as const
 
 /**
  * Only fields the API actually keeps.
  *
  * Both meeting-type routes validate with `whitelist: true`, which silently
- * drops any property without a class-validator decorator — and six `MeetingInfo`
- * properties have none (`customChannelName`, `customChannelLink`,
- * `connectChannelName`, `groupBooking`, `enrichInvitee`, `confirmationButton`),
- * as do `slug` and `userId` on the create DTO. Offering them here would be a
- * lie: the request succeeds, the setting is discarded, and nobody finds out
- * until someone opens the booking page. They are configured in the dashboard.
+ * drops any property without a class-validator decorator. Offering a field the
+ * API drops would be a lie: the request succeeds, the setting is discarded, and
+ * nobody finds out until someone opens the booking page. Add a field only when
+ * the current OpenAPI spec documents it on the DTO (`slug` on the create DTO is
+ * marked deprecated/ignored and stays out; `confirmationButton`, localised
+ * names and the nested policy objects are left to the dashboard).
  *
  * `description` is required on create — it carries `@IsString()` with no
  * `@IsOptional()` — which is why it is not optional below.
@@ -236,6 +305,79 @@ const meetingInfoShape = {
   passEventDetailsToRedirect: z.boolean().optional(),
   color: z.string().optional().describe('Hex, e.g. #e55000'),
 }
+
+/**
+ * Documented on UpdateMeetingInfoDto in the current spec. Kept off the create
+ * tool: whether the create route keeps them is not visible in the spec, and
+ * the repo's wire test pins them as dropped there.
+ */
+const meetingInfoUpdateOnlyShape = {
+  customChannelName: z.string().optional().describe('Display name for channel "custom"'),
+  customChannelLink: z.string().optional().describe('Link for channel "custom"'),
+  connectChannelName: z.string().optional().describe('Display name for channel "connect"'),
+  groupBooking: z.boolean().optional().describe('Several attendees per slot (see spots)'),
+  rollingSlots: z
+    .boolean()
+    .optional()
+    .describe('Restart the slot grid after each appointment'),
+}
+
+/**
+ * Meeting-type settings that sit beside `meetingInfo` and are shared by the
+ * create and update DTOs (same names, same limits).
+ */
+const meetingTypeCommonShape = {
+  spots: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe('Attendees per slot, for a group booking'),
+  locations: z.array(z.string()).optional().describe('Available locations (addresses)'),
+  availabilityId: z
+    .string()
+    .uuid()
+    .optional()
+    .describe('Existing availability schedule to use'),
+  internalNotes: z
+    .string()
+    .max(5000)
+    .nullable()
+    .optional()
+    .describe('Organizer-only note, never shown to customers. null clears it.'),
+  contactTags: z
+    .array(z.string().max(64))
+    .max(10)
+    .optional()
+    .describe('Tags added to the CRM contact of everyone who books (max 10)'),
+  sendHostCalendarInvite: z
+    .boolean()
+    .optional()
+    .describe('Host notification emails carry a calendar invite. Default on.'),
+  daysIntoFuture: z
+    .object({
+      mode: z.enum(['limit', 'range', 'forever']),
+      bookingLimit: z.number().min(1).optional().describe('limit mode: minutes from now'),
+      rangeMin: z.string().optional().describe('range mode: ISO 8601'),
+      rangeMax: z.string().optional().describe('range mode: ISO 8601'),
+      countMode: z.enum(['calendar', 'weekday']).optional().describe('limit mode'),
+    })
+    .optional()
+    .describe('How far ahead people can book'),
+  ics: z
+    .object({
+      title: z.union([z.string(), z.record(z.string())]).optional(),
+      description: z.union([z.string(), z.record(z.string())]).optional(),
+      location: z.union([z.string(), z.record(z.string())]).optional(),
+    })
+    .optional()
+    .describe(
+      'Calendar invite templates; a string, or {"en": "...", "de": "..."} per language',
+    ),
+}
+
+const MEETING_TYPE_TOP_LEVEL = Object.keys(meetingTypeCommonShape)
 
 /**
  * A webhook target the API will POST to on every matching event, unattended.
@@ -267,28 +409,6 @@ const httpsUrl = z
       /^172\.(1[6-9]|2\d|3[01])\./.test(host)
     )
   }, 'Must be an https URL on a public host')
-
-/** Shared pagination for the list endpoints that use limit/offset. */
-const listLimit = z
-  .number()
-  .int()
-  .min(1)
-  .max(100)
-  .optional()
-  .describe('Max results, 1-100. Defaults to 50.')
-const listOffset = z
-  .number()
-  .int()
-  .min(0)
-  .optional()
-  .describe('How many to skip. Defaults to 0.')
-
-/** Drops keys the caller never set, so a patch stays a patch. */
-function definedOnly(args: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(args).filter(([, v]) => v !== undefined),
-  )
-}
 
 type CrmScopeId = { crmCompanyId?: string; dealId?: string; contactId?: string }
 
@@ -346,6 +466,21 @@ function summarizeContact(raw: unknown): ContactSummary {
     phoneNumber: typeof c.phoneNumber === 'string' ? c.phoneNumber : undefined,
     crmCompanyId: typeof c.crmCompanyId === 'string' ? c.crmCompanyId : undefined,
   }
+}
+
+/**
+ * Pull the array of data-field rows out of a /data-field page. Unconfirmed
+ * against the live API which of these shapes it actually returns (a bare
+ * array vs a wrapped page), so every plausible one is tried before giving up
+ * on the page — same defensive spirit as summarizeContact's callers above.
+ */
+function extractDataFields(response: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(response)) return response as Array<Record<string, unknown>>
+  const r = (response ?? {}) as Record<string, unknown>
+  for (const key of ['data', 'items', 'result', 'fields']) {
+    if (Array.isArray(r[key])) return r[key] as Array<Record<string, unknown>>
+  }
+  return []
 }
 
 /**
@@ -505,6 +640,30 @@ export const TOOLS: ToolDefinition[] = [
         .string()
         .optional()
         .describe('Rarely needed — resolved from the meeting type by default.'),
+      calculationMethod: z
+        .enum(['everyone', 'anyone'])
+        .optional()
+        .describe('Multi-host types: slots where everyone or anyone is free'),
+      channel: z
+        .enum(MEETING_CHANNELS)
+        .optional()
+        .describe('Per-channel availability lookup for this location type'),
+      attendeeEmail: z
+        .string()
+        .optional()
+        .describe(
+          'Booker email, for round-robin types with account-owner matching: narrows to the matched host',
+        ),
+      hideGroupAppointments: z.boolean().optional(),
+      troubleshoot: z
+        .boolean()
+        .optional()
+        .describe('Also return blocked timeslots, to diagnose missing slots'),
+      refreshCache: z
+        .boolean()
+        .optional()
+        .describe('Skip the availability cache, e.g. after a slot-occupied error'),
+      resourceChannelIds: z.array(z.string()).optional().describe('Resource channel ids'),
     },
     readOnly: true,
     run: async (client, args) => {
@@ -539,14 +698,20 @@ export const TOOLS: ToolDefinition[] = [
         .describe(
           'Length in minutes. Required only when the availability query used a duration override; otherwise the meeting type decides.',
         ),
-      email: z.string().email().describe('Attendee email'),
-      firstName: z.string().optional(),
-      lastName: z.string().optional(),
+      email: z
+        .string()
+        .email()
+        .optional()
+        .describe('Attendee email. Required unless phoneOnlyBooking is true.'),
+      firstName: z.string().max(150).optional(),
+      lastName: z.string().max(150).optional(),
       fullName: z
         .string()
+        .max(150)
         .optional()
         .describe('Use when the name cannot be split reliably'),
       phone: z.string().optional(),
+      language: z.enum(ATTENDEE_LANGUAGES).optional().describe('Attendee language'),
       timezone: z
         .string()
         .optional()
@@ -576,6 +741,42 @@ export const TOOLS: ToolDefinition[] = [
         .string()
         .optional()
         .describe('Rarely needed — resolved from the meeting type by default.'),
+      channel: z
+        .enum(MEETING_CHANNELS)
+        .optional()
+        .describe('Location type, when the meeting type offers several'),
+      ignoreAvailability: z
+        .boolean()
+        .optional()
+        .describe(
+          'Skip availability, conflict and capacity checks (team members only). Confirm with the user first.',
+        ),
+      skipNotifications: z
+        .boolean()
+        .optional()
+        .describe('Do not email the attendee about this booking'),
+      phoneOnlyBooking: z
+        .boolean()
+        .optional()
+        .describe(
+          'Book without an email, phone identifies the attendee. Needs allowPhoneOnlyBooking on the meeting type.',
+        ),
+      icsTitle: z.string().max(200).optional().describe('Overrides the calendar invite title'),
+      icsDescription: z
+        .string()
+        .max(2000)
+        .optional()
+        .describe('Overrides the calendar invite description'),
+      bookingPassword: z
+        .string()
+        .optional()
+        .describe('For a password-protected booking page'),
+      couponCode: z.string().max(32).optional().describe('Discount code for paid bookings'),
+      priceOptionId: z
+        .string()
+        .max(64)
+        .optional()
+        .describe('Chosen price option, for meeting types priced by options'),
     },
     readOnly: false,
     openWorld: true,
@@ -591,12 +792,22 @@ export const TOOLS: ToolDefinition[] = [
         lastName,
         fullName,
         phone,
+        language,
         timezone,
         receiveReminders,
         notes,
         guestEmails,
         hostIds,
         queueId,
+        channel,
+        ignoreAvailability,
+        skipNotifications,
+        phoneOnlyBooking,
+        icsTitle,
+        icsDescription,
+        bookingPassword,
+        couponCode,
+        priceOptionId,
       },
     ) => {
       // The API accepts an attendee with no name at all and writes an empty one
@@ -606,6 +817,10 @@ export const TOOLS: ToolDefinition[] = [
         throw new Error(
           'Provide the attendee name: either fullName, or firstName and lastName.',
         )
+      }
+
+      if (!email && !phoneOnlyBooking) {
+        throw new Error('Provide the attendee email (or set phoneOnlyBooking with a phone).')
       }
 
       const scope =
@@ -625,12 +840,22 @@ export const TOOLS: ToolDefinition[] = [
           start,
           duration,
           ...scope,
+          channel,
+          ignoreAvailability,
+          skipNotifications,
+          phoneOnlyBooking,
+          icsTitle,
+          icsDescription,
+          bookingPassword,
+          couponCode,
+          priceOptionId,
           attendee: {
             email,
             firstname: firstName,
             lastname: lastName,
             fullname: fullName,
             phone,
+            language,
             timezone,
             receiveReminders: receiveReminders ?? true,
             dataPolicyAccepted: true,
@@ -730,6 +955,10 @@ export const TOOLS: ToolDefinition[] = [
       search: z.string().optional().describe('Free-text search'),
       status: z.string().optional(),
       meetingTypeId: z.string().optional(),
+      channel: z.enum(MEETING_CHANNELS).optional().describe('Filter by location type'),
+      workspaceId: z.string().optional(),
+      all: z.boolean().optional().describe('Every booking in the company (admin only)'),
+      userId: z.string().optional().describe("Another user's bookings (admin only)"),
       sortBy: z.enum(['appointment.start', 'appointment.createdAt']).optional(),
       sortDirection: z.enum(['ASC', 'DESC']).optional(),
     },
@@ -749,12 +978,22 @@ export const TOOLS: ToolDefinition[] = [
     title: "Get today's appointments",
     description:
       "Return today's appointments for the authenticated user. This specialised query is cheaper and more precise than a general date-filtered appointment list.",
-    schema: {},
+    schema: {
+      timezone: z
+        .string()
+        .optional()
+        .describe('IANA timezone that defines "today", e.g. Europe/Berlin. Defaults to this machine.'),
+    },
     readOnly: true,
-    run: async (client) =>
+    // The API marks `timezone` required; without it "today" has no meaning.
+    run: async (client, { timezone }) =>
       presentSchedulingResult(
         'today-appointments',
-        await client.request('GET', '/appointment/today'),
+        await client.request('GET', '/appointment/today', {
+          query: {
+            timezone: timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+          },
+        }),
       ),
   },
   {
@@ -946,6 +1185,7 @@ export const TOOLS: ToolDefinition[] = [
       notes: z.string().optional().describe('Internal notes, not visible to the contact'),
       accountOwnerId: z.string().optional(),
       crmCompanyId: z.string().optional(),
+      birthday: z.string().nullable().optional().describe('YYYY-MM-DD'),
       address: contactAddressSchema,
       additionalData: z
         .record(z.unknown())
@@ -981,6 +1221,7 @@ export const TOOLS: ToolDefinition[] = [
       accountOwnerId: z.string().optional(),
       crmCompanyId: z.string().nullable().optional(),
       language: z.string().max(8).optional().describe('ISO 639-1, e.g. "de"'),
+      birthday: z.string().nullable().optional().describe('YYYY-MM-DD; null clears it'),
       address: contactAddressSchema,
       title: z.string().optional(),
       employer: z.string().optional(),
@@ -1001,13 +1242,83 @@ export const TOOLS: ToolDefinition[] = [
       client.request('PATCH', `/crm/${contactId}`, { body, root: true }),
   },
   {
+    name: 'set_contact_source_type',
+    title: "Tag a contact's source type",
+    description:
+      "Tag a contact with an account-defined source-type flag (e.g. network_contact vs standard_customer vs cold_outreach) — the distinction later automation needs before it may ever propose a multi-step sequence instead of a single individual touch for a given contact. Provisions its own backing field on first use: pages through the reusable form fields looking for one whose internal key already matches, and only creates a new select field when none is found, so this does not depend on someone setting the field up by hand in the account first. Whether that field listing comes back as a bare array or a wrapped page is unconfirmed against the live API, so both are handled.",
+    schema: {
+      contactId: z.string(),
+      value: z.string().describe('e.g. network_contact, standard_customer or cold_outreach — the taxonomy is account-specific, not fixed by the API'),
+      contactSourceField: z
+        .string()
+        .optional()
+        .describe(
+          "Custom field key to write, and its internal key if it has to be created. Defaults to 'contactSourceType' — the same default the quiet-deals finder reads.",
+        ),
+      fieldLabel: z.string().optional().describe("Label shown on the field if it must be created. Defaults to 'Kontaktart'."),
+      fieldOptions: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Select options if the field must be created. Defaults to ['network_contact', 'standard_customer', 'cold_outreach'].",
+        ),
+    },
+    readOnly: false,
+    run: async (client, args) => {
+      const field = args.contactSourceField ?? 'contactSourceType'
+      const label = args.fieldLabel ?? 'Kontaktart'
+      const options: string[] = args.fieldOptions ?? ['network_contact', 'standard_customer', 'cold_outreach']
+
+      let fieldExists = false
+      for (let offset = 0; ; offset += 50) {
+        const response = await client.request('GET', '/data-field', { query: { limit: 50, offset } })
+        const batch = extractDataFields(response)
+        if (batch.some((f) => f.name === field)) {
+          fieldExists = true
+          break
+        }
+        if (batch.length < 50) break
+      }
+
+      let fieldCreated = false
+      if (!fieldExists) {
+        await client.request('POST', '/data-field', {
+          body: {
+            label,
+            fieldType: 'select',
+            name: field,
+            options: options.map((value) => ({ label: value, value })),
+          },
+        })
+        fieldCreated = true
+      }
+
+      await client.request('PATCH', `/crm/${args.contactId}`, {
+        body: { additionalData: { [field]: args.value } },
+        root: true,
+      })
+
+      return {
+        contactId: args.contactId,
+        contactSourceField: field,
+        value: args.value,
+        fieldCreated,
+      }
+    },
+  },
+  {
     name: 'list_calendar_connections',
     title: 'List calendar connections',
     description:
       'List connected calendars (Google, Outlook and CalDAV). The result shows whether a host has a calendar attached and supports availability diagnosis.',
-    schema: {},
+    schema: {
+      userId: z.string().optional().describe("Another user's connections (admin only)"),
+    },
     readOnly: true,
-    run: (client) => client.request('GET', '/calendar-connections/connections'),
+    run: (client, query) =>
+      client.request('GET', '/calendar-connections/connections', {
+        query: definedOnly(query),
+      }),
   },
 
   // ---- Follow-up ----------------------------------------------------------
@@ -1036,14 +1347,18 @@ export const TOOLS: ToolDefinition[] = [
       appointmentId: z.string(),
       transcription: z
         .string()
+        .max(500000)
         .nullable()
         .optional()
         .describe('Full transcript in markdown, or null to clear'),
       summary: z
         .string()
+        .max(100000)
         .nullable()
         .optional()
         .describe('Summary in markdown, or null to clear'),
+      actualStartAt: z.string().optional().describe('ISO 8601, when the recorded conversation began'),
+      actualEndAt: z.string().optional().describe('ISO 8601, when the recorded conversation ended'),
     },
     readOnly: false,
     destructive: true,
@@ -1071,20 +1386,32 @@ export const TOOLS: ToolDefinition[] = [
       'Create a new meeting type owned by the authenticated user. It becomes a real, publicly bookable page immediately. The URL slug is generated from the name and remains editable.',
     schema: {
       ...meetingInfoShape,
-      spots: z
-        .number()
-        .int()
-        .min(1)
-        .max(100)
+      ...meetingTypeCommonShape,
+      isGlobalQueue: z
+        .boolean()
         .optional()
-        .describe('Attendees per slot, for a group booking'),
+        .describe('Create as a company-wide round robin'),
+      workspaceId: z.string().uuid().optional().describe('Workspace, for workspace meeting types'),
     },
     readOnly: false,
     openWorld: true,
-    run: (client, { spots, ...info }) =>
-      client.request('POST', '/meeting-type', {
-        body: { meetingInfo: definedOnly(info), spots },
-      }),
+    run: (client, args) => {
+      const { isGlobalQueue, workspaceId, ...rest } = args
+      const top = Object.fromEntries(
+        Object.entries(rest).filter(([k]) => MEETING_TYPE_TOP_LEVEL.includes(k)),
+      )
+      const info = Object.fromEntries(
+        Object.entries(rest).filter(([k]) => !MEETING_TYPE_TOP_LEVEL.includes(k)),
+      )
+      return client.request('POST', '/meeting-type', {
+        body: {
+          meetingInfo: definedOnly(info),
+          ...top,
+          isGlobalQueue,
+          workspaceId,
+        },
+      })
+    },
   },
   {
     name: 'update_meeting_type',
@@ -1094,6 +1421,8 @@ export const TOOLS: ToolDefinition[] = [
     schema: {
       meetingTypeId: z.string(),
       ...meetingInfoShape,
+      ...meetingTypeCommonShape,
+      ...meetingInfoUpdateOnlyShape,
       // Everything is optional on a patch — the create-time requirements do
       // not apply, and UpdateMeetingInfoDto is fully partial.
       name: meetingInfoShape.name.optional(),
@@ -1102,20 +1431,45 @@ export const TOOLS: ToolDefinition[] = [
       channel: meetingInfoShape.channel.optional(),
       // Unlike the create DTO, slug is validated here, so it survives.
       slug: z.string().optional().describe('URL segment of the booking page'),
-      spots: z.number().int().min(1).max(100).optional(),
+      enabled: z.boolean().optional().describe('Enable or disable the meeting type'),
+      timeslotInterval: z
+        .number()
+        .int()
+        .min(5)
+        .max(60)
+        .optional()
+        .describe('Minutes between offered slots, 5 to 60'),
+      bookingMinimum: z
+        .number()
+        .int()
+        .min(0)
+        .max(10080)
+        .optional()
+        .describe('Minimum booking notice in minutes, max 10080'),
     },
     readOnly: false,
     openWorld: true,
     destructive: true,
-    run: (client, { meetingTypeId, slug, spots, ...info }) => {
-      const meetingInfo = definedOnly(info)
+    run: (client, args) => {
+      const { meetingTypeId, slug, enabled, timeslotInterval, bookingMinimum, ...rest } = args
+      const top = Object.fromEntries(
+        Object.entries(rest).filter(([k]) => MEETING_TYPE_TOP_LEVEL.includes(k)),
+      )
+      const meetingInfo = definedOnly(
+        Object.fromEntries(
+          Object.entries(rest).filter(([k]) => !MEETING_TYPE_TOP_LEVEL.includes(k)),
+        ),
+      )
       return client.request('PATCH', `/meeting-type/${meetingTypeId}`, {
-        // Omit meetingInfo entirely when only slug or spots changed, rather
-        // than sending an empty object.
+        // Omit meetingInfo entirely when only top-level settings changed,
+        // rather than sending an empty object.
         body: {
           ...(Object.keys(meetingInfo).length ? { meetingInfo } : {}),
+          ...top,
           slug,
-          spots,
+          enabled,
+          timeslotInterval,
+          bookingMinimum,
         },
       })
     },
@@ -1158,6 +1512,28 @@ export const TOOLS: ToolDefinition[] = [
       headerImage: z.string().nullable().optional().describe('Image URL, or null to remove'),
       description: z.string().optional(),
       showAllMeetingTypes: z.boolean().optional(),
+      showMeetingsSection: z
+        .boolean()
+        .optional()
+        .describe('Show the automatic meetings section above the content blocks'),
+      showContactExchange: z
+        .boolean()
+        .optional()
+        .describe('Offer visitors the contact-exchange form next to "save contact"'),
+      theme: z
+        .object({
+          preset: z.string().optional().describe('e.g. classic, nocturne'),
+          accent: z.string().optional().describe('Hex'),
+          background: z
+            .object({ type: z.enum(['solid', 'gradient', 'image']), value: z.string() })
+            .partial()
+            .optional(),
+          font: z.enum(['sans', 'serif', 'grotesk', 'mono', 'condensed', 'rounded']).optional(),
+          buttonShape: z.enum(['sharp', 'rounded', 'pill']).optional(),
+        })
+        .nullable()
+        .optional()
+        .describe('Card theme; null restores the default look (useCustomColors then applies)'),
       meetingTypeOrder: z
         .array(z.string())
         .optional()
@@ -1364,12 +1740,18 @@ export const TOOLS: ToolDefinition[] = [
         .optional()
         .describe('For choice fields: [{ label, value }]'),
       target: z
-        .string()
+        .enum(DATA_FIELD_TARGETS)
         .optional()
-        .describe('Maps the answer onto a known attendee field rather than a custom one'),
+        .describe('Maps the answer onto a known attendee field. Defaults to other (custom).'),
+      ...dataFieldExtraShape,
     },
     readOnly: false,
-    run: (client, body) => client.request('POST', '/data-field', { body }),
+    // The API lists target, default, required and hidden as required on create;
+    // fill the neutral values so the model need not know.
+    run: (client, body) =>
+      client.request('POST', '/data-field', {
+        body: { target: 'other', default: false, required: false, hidden: false, ...definedOnly(body) },
+      }),
   },
   {
     name: 'update_data_field',
@@ -1383,7 +1765,8 @@ export const TOOLS: ToolDefinition[] = [
       name: z.string().optional(),
       required: z.boolean().optional(),
       options: z.array(z.record(z.unknown())).optional().describe('For choice fields: [{ label, value }]'),
-      target: z.string().optional(),
+      target: z.enum(DATA_FIELD_TARGETS).optional(),
+      ...dataFieldExtraShape,
     },
     readOnly: false,
     run: (client, { fieldId, ...body }) => client.request('PATCH', `/data-field/${fieldId}`, { body }),
@@ -1779,6 +2162,13 @@ export const TOOLS: ToolDefinition[] = [
         .nullable()
         .optional()
         .describe('null clears the account owner, leaving the deal unassigned'),
+      winProbability: z
+        .number()
+        .min(0)
+        .max(100)
+        .nullable()
+        .optional()
+        .describe('Win probability in percent for this deal only; null returns it to the value of its stage. Sent together with stageId it applies to the new stage.'),
       customFields: z.record(z.unknown()).optional(),
     },
     readOnly: false,
@@ -1940,6 +2330,106 @@ export const TOOLS: ToolDefinition[] = [
     schema: {},
     readOnly: true,
     run: (client) => client.request('GET', '/crm/deals/limits', { root: true }),
+  },
+  {
+    name: 'get_quiet_contacts',
+    title: 'Find quiet deals worth a follow-up',
+    description:
+      "Filter and rank open deals that have gone quiet, reusing the health signal already attached to every deal (signal.daysSinceLastActivity, isRotting) instead of reconstructing rhythm from each deal's own activity log — the same computed-client-side, no-dedicated-endpoint approach this server already uses for duplicate detection. A deal counts as quiet when its stage-level isRotting flag is set, or signal.daysSinceLastActivity reaches minDaysSinceActivity (default 14). Ranked by deal value descending, not by silence duration — a long-quiet low-value deal isn't automatically more urgent than a recently-quiet high-value one — but healthBand and followUpsSinceLastReply still come back on every hit so the caller can re-rank ties itself. Pages through every open deal with no hard cap. This connector has no built-in contact-source-type field — meetergo's CRM doesn't ship one — so contactSourceType is read from the contact's additionalData under contactSourceField (default 'contactSourceType') and comes back null on every hit until that custom data field is created on the account.",
+    schema: {
+      minDaysSinceActivity: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          'Quiet threshold in days since last activity. Defaults to 14. A deal already flagged isRotting counts regardless of this value.',
+        ),
+      pipelineId: z.string().optional(),
+      ownerId: z.string().optional(),
+      contactSourceField: z
+        .string()
+        .optional()
+        .describe(
+          "additionalData key on the contact to read as the source-type flag, e.g. network_contact vs standard_customer. Defaults to 'contactSourceType' — whatever key was chosen when the field was created with create_data_field, not a fixed API field.",
+        ),
+      contactSourceType: z
+        .string()
+        .optional()
+        .describe('Only return hits whose contact additionalData[contactSourceField] equals this value exactly.'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('How many ranked hits to return. Defaults to 20 — the scan itself still covers every open deal.'),
+    },
+    readOnly: true,
+    run: async (client, args) => {
+      const pageSize = 200
+      const sourceField = args.contactSourceField ?? 'contactSourceType'
+      const deals: Record<string, unknown>[] = []
+      for (let page = 1; ; page += 1) {
+        const response = (await client.request('GET', '/crm/deals', {
+          query: {
+            page,
+            limit: pageSize,
+            isOpen: true,
+            pipelineId: args.pipelineId,
+            ownerId: args.ownerId,
+          },
+          root: true,
+        })) as { deals?: unknown[] }
+        const batch = Array.isArray(response.deals) ? (response.deals as Record<string, unknown>[]) : []
+        deals.push(...batch)
+        if (batch.length < pageSize) break
+      }
+
+      const minDays = args.minDaysSinceActivity ?? 14
+      const hits = deals
+        .map((deal) => {
+          const signal = (deal.signal ?? {}) as Record<string, unknown>
+          const contact = (deal.contact ?? {}) as Record<string, unknown>
+          const additionalData = (contact.additionalData ?? {}) as Record<string, unknown>
+          const daysSinceLastActivity =
+            typeof signal.daysSinceLastActivity === 'number' ? signal.daysSinceLastActivity : undefined
+          const isRotting = deal.isRotting === true
+          const rawSourceType = additionalData[sourceField]
+          return {
+            dealId: String(deal.id ?? ''),
+            dealName: typeof deal.name === 'string' ? deal.name : undefined,
+            value: typeof deal.value === 'number' ? deal.value : undefined,
+            currency: typeof deal.currency === 'string' ? deal.currency : undefined,
+            pipelineId: typeof deal.pipelineId === 'string' ? deal.pipelineId : undefined,
+            stageId: typeof deal.stageId === 'string' ? deal.stageId : undefined,
+            enteredStageAt: typeof deal.enteredStageAt === 'string' ? deal.enteredStageAt : undefined,
+            isRotting,
+            daysSinceLastActivity,
+            healthBand: typeof signal.healthBand === 'string' ? signal.healthBand : undefined,
+            followUpsSinceLastReply:
+              typeof signal.followUpsSinceLastReply === 'number' ? signal.followUpsSinceLastReply : undefined,
+            contactId: typeof contact.id === 'string' ? contact.id : undefined,
+            contactFirstName: typeof contact.firstName === 'string' ? contact.firstName : undefined,
+            contactLastName: typeof contact.lastName === 'string' ? contact.lastName : undefined,
+            contactEmail: typeof contact.email === 'string' ? contact.email : undefined,
+            crmCompanyId: typeof deal.crmCompanyId === 'string' ? deal.crmCompanyId : undefined,
+            contactSourceType:
+              typeof rawSourceType === 'string' || typeof rawSourceType === 'number' ? rawSourceType : null,
+            _quiet: isRotting || (daysSinceLastActivity !== undefined && daysSinceLastActivity >= minDays),
+          }
+        })
+        .filter((hit) => hit._quiet)
+        .filter((hit) => args.contactSourceType === undefined || hit.contactSourceType === args.contactSourceType)
+        .sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
+        .slice(0, args.limit ?? 20)
+        .map(({ _quiet, ...hit }) => hit)
+
+      return {
+        totalOpenDealsScanned: deals.length,
+        quietDeals: hits,
+      }
+    },
   },
   {
     name: 'find_duplicate_deals',
@@ -2290,6 +2780,8 @@ export const TOOLS: ToolDefinition[] = [
       contactId: z.string().optional(),
       crmCompanyId: z.string().optional(),
       subject: z.string().optional(),
+      durationSeconds: z.number().min(0).optional().describe('Only meaningful for calls'),
+      externalId: z.string().optional().describe('ID in the source system, e.g. an email thread id'),
       outcome: z.enum(COMMUNICATION_OUTCOMES).optional().describe('Only meaningful for calls'),
     },
     readOnly: false,
@@ -2353,6 +2845,7 @@ export const TOOLS: ToolDefinition[] = [
       'Log a note against a CRM company, contact or deal. Exactly one of crmCompanyId, contactId or dealId is required — the API rejects zero or more than one.',
     schema: {
       content: z.string(),
+      isPinned: z.boolean().optional().describe('Pin the note to the top'),
       crmCompanyId: z.string().optional(),
       contactId: z.string().optional(),
       dealId: z.string().optional(),
@@ -2482,6 +2975,16 @@ export const TOOLS: ToolDefinition[] = [
       priority: z.enum(['low', 'medium', 'high']).optional().describe('Defaults to medium'),
       reminderAt: z.string().optional().describe('ISO 8601, separate from dueDate'),
       assigneeId: z.string().optional(),
+      assigneeIds: z
+        .array(z.string())
+        .optional()
+        .describe('Everyone the task is offered to; any of them can take it. assigneeId, when on the list, is the primary, otherwise the first id is.'),
+      sourceRef: z
+        .string()
+        .max(200)
+        .regex(/^[a-z]+:[A-Za-z0-9:._-]+$/)
+        .optional()
+        .describe('Where the task came from, e.g. notetaker:<session>:<item>'),
       crmCompanyId: z.string().optional(),
       dealId: z.string().optional(),
       contactId: z.string().optional(),
@@ -2503,6 +3006,7 @@ export const TOOLS: ToolDefinition[] = [
       priority: z.enum(['low', 'medium', 'high']).optional(),
       reminderAt: z.string().optional().describe('ISO 8601, separate from dueDate'),
       assigneeId: z.string().optional(),
+      assigneeIds: z.array(z.string()).optional().describe('Replaces the people the task is offered to'),
       crmCompanyId: z.string().optional(),
       dealId: z.string().nullable().optional(),
       contactId: z.string().nullable().optional(),
@@ -2539,6 +3043,78 @@ export const TOOLS: ToolDefinition[] = [
     destructive: true,
     run: (client, { taskId }) =>
       client.request('DELETE', `/crm/tasks/${taskId}`, { root: true }),
+  },
+  {
+    name: 'log_personal_followup',
+    title: 'Log a personal follow-up conversation',
+    description:
+      "Log a personal conversation as a fixed, labeled note (Anliegen/Kontext/Zusage) plus a linked reminder task, instead of leaving the hard facts a later message needs — the concern raised, the promise made and its deadline — to whatever free text an agent happens to write. That structure is what lets a later draft-composing step check there is enough real, specific context before it writes anything, rather than inventing warmth. Defaults the reminder to 30 days out when no explicit date is given. Once the follow-up message is actually sent, close the reminder out with the dedicated complete endpoint rather than deleting it — that status is confirmed to persist now, so deleting would throw the record away for no reason. These are two sequential writes with no transaction across them: when the note is logged but the linked task then fails to create, the result comes back (not thrown) with taskCreated false, the note already saved, and a ready-to-use suggestedTask payload — pass that straight to the dedicated task-creation tool before moving on. Do not call this one again for the same conversation, that logs it a second time. Skipping the follow-up call leaves a note with no linked reminder that nothing else surfaces — treat taskCreated false as something to act on immediately, not just a status to note.",
+    schema: {
+      contactId: z.string(),
+      need: z.string().describe('The concern or ask the other person raised, concretely — not a vague summary'),
+      context: z.string().optional().describe('Any other context worth keeping about the conversation'),
+      commitment: z.string().describe('The promise made, e.g. "melde mich mit einem Angebot"'),
+      commitmentDueDate: z
+        .string()
+        .optional()
+        .describe('ISO 8601 date — deadline for the promise itself, if one was actually given'),
+      followUpDueDate: z
+        .string()
+        .optional()
+        .describe('ISO 8601 — due date for the reminder task. Defaults to 30 days from now.'),
+      contactName: z
+        .string()
+        .optional()
+        .describe('Used only for the reminder task title; omitted, the title falls back to the contact id'),
+    },
+    readOnly: false,
+    run: async (client, args) => {
+      const followUpDueDate =
+        args.followUpDueDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      const content = [
+        `Anliegen: ${args.need}`,
+        args.context ? `Kontext: ${args.context}` : undefined,
+        `Zusage: ${args.commitment}${args.commitmentDueDate ? ` (bis ${args.commitmentDueDate})` : ''}`,
+      ]
+        .filter((line): line is string => Boolean(line))
+        .join('\n')
+
+      const note = await client.request('POST', '/crm/notes', {
+        body: { content, contactId: args.contactId },
+        root: true,
+      })
+
+      const taskBody = {
+        title: `Persönlich nachfassen: ${args.contactName ?? args.contactId}`,
+        type: 'follow_up',
+        dueDate: followUpDueDate,
+        description: content,
+        contactId: args.contactId,
+      }
+
+      // Two sequential writes, no transaction across them. The note is the
+      // conversation record a person already gave once — if the linked task
+      // then fails (timeout, rate limit), surface that instead of throwing a
+      // generic error that hides the fact the note went through, and don't
+      // roll the note back either: deleting it risks a second failure on the
+      // same transient cause, for no gain over just retrying the task alone.
+      // taskBody comes back as suggestedTask so the caller can create it with
+      // no reconstruction — a flag alone is too easy to leave unactioned.
+      try {
+        const task = await client.request('POST', '/crm/tasks', { body: taskBody, root: true })
+        return { note, task, content, followUpDueDate, taskCreated: true }
+      } catch (err) {
+        return {
+          note,
+          task: null,
+          content,
+          followUpDueDate,
+          taskCreated: false,
+          taskError: err instanceof Error ? err.message : String(err),
+          suggestedTask: taskBody,
+        }
+      }
+    },
   },
 
   // ---- Webhooks -----------------------------------------------------------
@@ -3115,4 +3691,12 @@ export const TOOLS: ToolDefinition[] = [
       }
     },
   },
+
+  // ---- Per-area modules (docs, availability, spaces, engagement, booking setup, invoicing)
+  ...DOCS_TOOLS,
+  ...AVAILABILITY_TOOLS,
+  ...SPACES_TOOLS,
+  ...ENGAGEMENT_TOOLS,
+  ...BOOKING_SETUP_TOOLS,
+  ...INVOICING_TOOLS,
 ]
